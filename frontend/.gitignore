@@ -1,45 +1,125 @@
-# Miscellaneous
-*.class
+# =========================================================
+# Flutter / Dart
+# =========================================================
+
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+
+# Generated documentation
+doc/api/
+
+# Flutter build files
+**/ios/Flutter/.last_build_id
+
+# =========================================================
+# Android
+# =========================================================
+
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# Signing keys (Never commit)
+*.jks
+*.keystore
+key.properties
+
+# =========================================================
+# iOS
+# =========================================================
+
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# =========================================================
+# macOS
+# =========================================================
+
+macos/Pods/
+
+# =========================================================
+# Linux / Windows
+# =========================================================
+
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# =========================================================
+# IDEs
+# =========================================================
+
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# =========================================================
+# Logs
+# =========================================================
+
 *.log
-*.pyc
+*.tmp
+*.temp
 *.swp
-.DS_Store
-.atom/
+*.lock.pid
+
+# =========================================================
+# Misc
+# =========================================================
+
+*.class
+*.pyc
 .build/
 .buildlog/
 .history
 .svn/
+.atom/
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# =========================================================
+# OS Generated Files
+# =========================================================
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# =========================================================
+# Environment
+# =========================================================
 
-# Symbolication related
+.env
+.env.*
+
+# =========================================================
+# Obfuscation / Symbolication
+# =========================================================
+
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# =========================================================
+# Firebase (Optional)
+# =========================================================
+
+firebase_app_id_file.json
+
+# =========================================================
+# Keep these files in Git
+# =========================================================
+
+!pubspec.lock
