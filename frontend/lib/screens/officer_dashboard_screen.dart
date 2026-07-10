@@ -32,7 +32,6 @@ class OfficerDashboardScreen extends StatelessWidget {
       body: Column(
         children: [
           _OfficerHeader(
-            name: 'Rajesh Kumar',
             designation: 'Junior Engineer · Bhondsi Block',
             onNotificationTap: () => push(context, const NotificationScreen()),
           ),
@@ -123,12 +122,10 @@ class OfficerDashboardScreen extends StatelessWidget {
 
 class _OfficerHeader extends StatelessWidget {
   const _OfficerHeader({
-    required this.name,
     required this.designation,
     required this.onNotificationTap,
   });
 
-  final String name;
   final String designation;
   final VoidCallback onNotificationTap;
 
@@ -147,26 +144,13 @@ class _OfficerHeader extends StatelessWidget {
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: Colors.white.withValues(alpha: 0.22),
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'O',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
-                  style: GoogleFonts.poppins(
+                  'नमस्ते 👋',
+                  style: GoogleFonts.notoSansDevanagari(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -187,6 +171,16 @@ class _OfficerHeader extends StatelessWidget {
             onPressed: onNotificationTap,
             icon: const Icon(Icons.notifications_rounded, color: Colors.white),
             tooltip: 'Notifications',
+          ),
+          const SizedBox(width: 4),
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.white.withValues(alpha: 0.22),
+            child: const Icon(
+              Icons.person_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ],
       ),

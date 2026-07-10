@@ -24,36 +24,34 @@ class _CitizenShellState extends State<CitizenShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(child: _screens[_index]),
-        NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (value) => setState(() => _index = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.assignment_outlined),
-              selectedIcon: Icon(Icons.assignment_rounded),
-              label: 'Complaints',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.map_outlined),
-              selectedIcon: Icon(Icons.map_rounded),
-              label: 'Map',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
-        ),
-      ],
+    return Scaffold(
+      body: _screens[_index],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (value) => setState(() => _index = value),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined, size: 24),
+            selectedIcon: Icon(Icons.home_rounded, size: 24),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assignment_outlined, size: 24),
+            selectedIcon: Icon(Icons.assignment_rounded, size: 24),
+            label: 'Complaints',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined, size: 24),
+            selectedIcon: Icon(Icons.map_rounded, size: 24),
+            label: 'Map',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline, size: 24),
+            selectedIcon: Icon(Icons.person_rounded, size: 24),
+            label: 'Profile',
+          ),
+        ],
+      ),
     );
   }
 }

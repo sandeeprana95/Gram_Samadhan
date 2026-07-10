@@ -41,7 +41,6 @@ class _OfficerActionScreenState extends State<OfficerActionScreen> {
         padding: const EdgeInsets.all(AppSpacing.screen),
         children: [
           _CitizenInfoCard(
-            name: 'Ramesh Kumar',
             phone: '+91 98765 43210',
             address: '${complaint.village}, Gurugram, Haryana',
           ),
@@ -132,12 +131,10 @@ class _SectionLabel extends StatelessWidget {
 
 class _CitizenInfoCard extends StatelessWidget {
   const _CitizenInfoCard({
-    required this.name,
     required this.phone,
     required this.address,
   });
 
-  final String name;
   final String phone;
   final String address;
 
@@ -161,8 +158,8 @@ class _CitizenInfoCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
-                    style: GoogleFonts.poppins(
+                    'नागरिक',
+                    style: GoogleFonts.notoSansDevanagari(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),

@@ -10,7 +10,6 @@ import 'settings_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  static const _name = 'Ramesh Kumar';
   static const _role = 'Citizen · Village Bhondsi, Gurugram';
 
   @override
@@ -20,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _ProfileHeader(name: _name, subtitle: _role),
+            const _ProfileHeader(subtitle: _role),
             Transform.translate(
               offset: const Offset(0, -28),
               child: Padding(
@@ -94,22 +93,13 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name, required this.subtitle});
+  const _ProfileHeader({required this.subtitle});
 
-  final String name;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final initials = name.trim().isEmpty
-        ? 'U'
-        : name
-            .trim()
-            .split(RegExp(r'\s+'))
-            .take(2)
-            .map((w) => w[0].toUpperCase())
-            .join();
 
     return Container(
       width: double.infinity,
@@ -122,28 +112,16 @@ class _ProfileHeader extends StatelessWidget {
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Column(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             radius: 40,
             backgroundColor: Colors.white,
-            child: Text(
-              initials,
-              style: GoogleFonts.poppins(
-                color: AppColors.primary,
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-              ),
+            child: Icon(
+              Icons.person_rounded,
+              color: AppColors.primary,
+              size: 44,
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            name,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
           Text(
             subtitle,
             textAlign: TextAlign.center,

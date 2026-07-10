@@ -15,9 +15,7 @@ import 'notification_screen.dart';
 import 'survey_dashboard_screen.dart';
 
 class CitizenDashboardScreen extends StatelessWidget {
-  const CitizenDashboardScreen({super.key, this.citizenName = 'Ramesh'});
-
-  final String citizenName;
+  const CitizenDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +26,6 @@ class CitizenDashboardScreen extends StatelessWidget {
       body: Column(
         children: [
           _DashboardHeader(
-            name: citizenName,
             onNotificationTap: () => push(context, const NotificationScreen()),
           ),
           Expanded(
@@ -148,11 +145,9 @@ class CitizenDashboardScreen extends StatelessWidget {
 
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
-    required this.name,
     required this.onNotificationTap,
   });
 
-  final String name;
   final VoidCallback onNotificationTap;
 
   @override
@@ -170,22 +165,9 @@ class _DashboardHeader extends StatelessWidget {
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: Colors.white.withValues(alpha: 0.22),
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'R',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'नमस्ते, $name',
+              'नमस्ते 👋',
               style: GoogleFonts.notoSansDevanagari(
                 color: Colors.white,
                 fontSize: 20,

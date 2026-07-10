@@ -36,7 +36,7 @@ void main() {
     await tester.pumpWidget(const PanchayatApp());
     await tester.pumpAndSettle(const Duration(seconds: 3));
 
-    expect(find.text('नमस्ते, Ramesh'), findsOneWidget);
+    expect(find.text('नमस्ते 👋'), findsOneWidget);
     expect(find.text('Panchayat Grievance System'), findsNothing);
   });
 }

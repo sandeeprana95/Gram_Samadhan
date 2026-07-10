@@ -163,12 +163,14 @@ class AppTheme {
         hintStyle: GoogleFonts.poppins(color: AppColors.mutedText),
       ),
       navigationBarTheme: NavigationBarThemeData(
+        height: 64,
         backgroundColor: AppColors.background,
         indicatorColor: AppColors.orangeTint,
+        labelPadding: const EdgeInsets.only(top: 4, bottom: 4),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return GoogleFonts.poppins(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
             color: selected ? AppColors.primary : AppColors.navInactive,
           );
@@ -176,6 +178,7 @@ class AppTheme {
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
+            size: 24,
             color: selected ? AppColors.primary : AppColors.navInactive,
           );
         }),
