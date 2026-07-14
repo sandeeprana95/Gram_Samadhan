@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/asset_types_data.dart';
+import '../models/asset_type.dart';
 import '../models/complaint.dart';
+import '../models/survey.dart';
 import '../navigation/app_navigation.dart';
+import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import 'complaint_success_screen.dart';
@@ -31,21 +35,142 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
     'Badshahpur Gram Panchayat',
   ];
 
-  String _category = _categories.first;
+  String? _category;
   String _village = _villages.first;
   String _panchayat = _panchayats.first;
   final _descriptionController = TextEditingController();
+  final _assetLocationController = TextEditingController();
+
+  List<AssetType> _assetTypes = const [];
+  String? _assetTypeId;
+  List<Survey> _assetInstances = const [];
+  String? _assetInstanceId;
+  bool _loadingTypes = true;
+  bool _loadingInstances = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAssetTypes());
+  }
 
   @override
   void dispose() {
     _descriptionController.dispose();
+    _assetLocationController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadAssetTypes() async {
+    try {
+      final types = await SurveyApi.getAssetTypes();
+      if (!mounted) return;
+      setState(() {
+        _assetTypes = types;
+        _loadingTypes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assetTypes = assetTypes;
+        _loadingTypes = false;
+      });
+    }
+  }
+
+  Future<void> _onAssetTypeChanged(String? id) async {
+    setState(() {
+      _assetTypeId = id;
+      _assetInstanceId = null;
+      _assetInstances = const [];
+      _assetLocationController.clear();
+      _loadingInstances = id != null;
+      if (id != null) {
+        final derived = _categoryFromAssetType(id);
+        if (derived != null) _category = derived;
+      }
+    });
+    if (id == null) return;
+
+    try {
+      final instances = await SurveyApi.getAssetTypeInstances(id);
+      if (!mounted) return;
+      setState(() {
+        _assetInstances = instances;
+        _loadingInstances = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assetInstances = const [];
+        _loadingInstances = false;
+      });
+    }
+  }
+
+  String? _categoryFromAssetType(String assetTypeId) {
+    final name = assetTypeById(assetTypeId)?.name.toLowerCase() ?? '';
+    if (name.contains('road') || name.contains('street network')) {
+      return 'Damaged Road';
+    }
+    if (name.contains('light') || name.contains('solar')) {
+      return 'Street Light';
+    }
+    if (name.contains('drain') || name.contains('sarovar')) {
+      return 'Drainage';
+    }
+    if (name.contains('tube') || name.contains('water')) {
+      return 'Water Supply';
+    }
+    return null;
+  }
+
+  String _instanceLabel(Survey survey) {
+    final typeName = assetTypeById(survey.assetTypeId)?.name ?? 'Asset';
+    return '$typeName - ${survey.gramPanchayat} GP';
+  }
+
   void _submit() {
+    if (_assetTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please select an asset type',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final hasInstances = _assetInstances.isNotEmpty;
+    if (hasInstances && _assetInstanceId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please select a specific asset',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!hasInstances && _assetLocationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please enter the asset location',
+            style: GoogleFonts.poppins(),
+          ),
+        ),
+      );
+      return;
+    }
+
     final complaint = Complaint(
       id: 'PG-2026-0149',
-      category: _category,
+      category: _category ?? 'General',
       village: _village,
       description: _descriptionController.text.trim().isEmpty
           ? 'Complaint registered from mobile app.'
@@ -54,6 +179,8 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
       status: ComplaintStatus.pending,
       officer: 'Not assigned',
       location: '28.3521, 77.0642',
+      assetTypeId: _assetTypeId,
+      assetInstanceId: _assetInstanceId,
     );
 
     pushReplacement(
@@ -64,6 +191,8 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasInstances = _assetInstances.isNotEmpty;
+
     return AppScaffold(
       title: 'New Complaint',
       body: Column(
@@ -74,14 +203,249 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildDropdown(
-                    label: 'Category',
+                  if (_loadingTypes)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _assetTypeId,
+                      hint: Text(
+                        '-- Choose an asset type --',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF212121),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Select Asset Type *',
+                        labelStyle: GoogleFonts.poppins(fontSize: 14),
+                        prefixIcon: const Icon(
+                          Icons.apartment_rounded,
+                          color: Color(0xFF9E9E9E),
+                        ),
+                        filled: true,
+                        fillColor: AppColors.background,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.button),
+                          borderSide: const BorderSide(
+                            color: AppColors.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.button),
+                          borderSide: const BorderSide(
+                            color: AppColors.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.button),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      items: [
+                        for (final type in _assetTypes)
+                          DropdownMenuItem(
+                            value: type.id,
+                            child: Text(
+                              type.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: _onAssetTypeChanged,
+                    ),
+                  if (_assetTypeId != null) ...[
+                    const SizedBox(height: AppSpacing.gap),
+                    if (_loadingInstances)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    else if (hasInstances)
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: _assetInstanceId,
+                        hint: Text(
+                          '-- Choose a specific asset --',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF212121),
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Select Specific Asset *',
+                          labelStyle: GoogleFonts.poppins(fontSize: 14),
+                          prefixIcon: const Icon(
+                            Icons.place_rounded,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.2,
+                            ),
+                          ),
+                        ),
+                        items: [
+                          for (final instance in _assetInstances)
+                            DropdownMenuItem(
+                              value: instance.id,
+                              child: Text(
+                                _instanceLabel(instance),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (id) =>
+                            setState(() => _assetInstanceId = id),
+                      )
+                    else ...[
+                      Text(
+                        'No surveyed assets found for this type in your area. Enter a location instead.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.mutedText,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _assetLocationController,
+                        style: GoogleFonts.poppins(fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: 'Asset location *',
+                          hintText: 'e.g. Near school gate, Ward 2',
+                          labelStyle: GoogleFonts.poppins(fontSize: 14),
+                          prefixIcon: const Icon(
+                            Icons.edit_location_alt_rounded,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                              width: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: AppSpacing.gap),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
                     value: _category,
-                    icon: Icons.category_rounded,
-                    items: _categories,
-                    onChanged: (value) {
-                      if (value != null) setState(() => _category = value);
-                    },
+                    hint: Text(
+                      '-- Optional --',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF212121),
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Category (optional)',
+                      labelStyle: GoogleFonts.poppins(fontSize: 14),
+                      prefixIcon: const Icon(
+                        Icons.category_rounded,
+                        color: Color(0xFF9E9E9E),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                        borderSide: const BorderSide(
+                          color: AppColors.border,
+                          width: 0.5,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                        borderSide: const BorderSide(
+                          color: AppColors.border,
+                          width: 0.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.button),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.2,
+                        ),
+                      ),
+                    ),
+                    items: [
+                      for (final item in _categories)
+                        DropdownMenuItem(value: item, child: Text(item)),
+                    ],
+                    onChanged: (value) => setState(() => _category = value),
                   ),
                   const SizedBox(height: AppSpacing.gap),
                   Row(
@@ -257,7 +621,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
     return DropdownButtonFormField<String>(
       isExpanded: true,
       isDense: compact,
-      initialValue: value,
+      value: value,
       style: GoogleFonts.poppins(
         fontSize: compact ? 13 : 14,
         fontWeight: FontWeight.w500,

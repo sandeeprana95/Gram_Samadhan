@@ -12,7 +12,7 @@ import 'complaint_details_screen.dart';
 import 'my_complaints_screen.dart';
 import 'new_complaint_screen.dart';
 import 'notification_screen.dart';
-import 'survey_dashboard_screen.dart';
+import 'asset_survey_screen.dart';
 
 class CitizenDashboardScreen extends StatelessWidget {
   const CitizenDashboardScreen({super.key});
@@ -101,7 +101,7 @@ class CitizenDashboardScreen extends StatelessWidget {
                         label: 'Survey',
                         color: AppColors.secondary,
                         background: AppColors.greenTint,
-                        onTap: () => push(context, const SurveyDashboardScreen()),
+                        onTap: () => push(context, const AssetSurveyScreen()),
                       ),
                       _QuickActionCard(
                         icon: Icons.map_rounded,

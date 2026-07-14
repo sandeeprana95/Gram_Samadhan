@@ -13,51 +13,10 @@ class PanchayatApp extends StatefulWidget {
   State<PanchayatApp> createState() => _PanchayatAppState();
 }
 
-class _PanchayatAppState extends State<PanchayatApp> with WidgetsBindingObserver {
+class _PanchayatAppState extends State<PanchayatApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
 
-  bool _splashCompleted = false;
-  bool _returningFromBackground = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _returningFromBackground = true;
-      return;
-    }
-
-    if (state == AppLifecycleState.resumed &&
-        _splashCompleted &&
-        _returningFromBackground) {
-      _returningFromBackground = false;
-      _showSplashAgain();
-    }
-  }
-
-  void _showSplashAgain() {
-    _navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => SplashScreen(onComplete: _onSplashComplete),
-      ),
-      (_) => false,
-    );
-  }
-
   void _onSplashComplete(AuthSession? session) {
-    _splashCompleted = true;
-
     final nextScreen = session != null && session.isValid
         ? dashboardForRole(session.role)
         : const LoginScreen();

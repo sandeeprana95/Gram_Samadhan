@@ -66,7 +66,11 @@ class AppRadius {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light() {
+  static ThemeData? _cachedLight;
+
+  static ThemeData light() => _cachedLight ??= _buildLight();
+
+  static ThemeData _buildLight() {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: AppColors.primary,
@@ -81,6 +85,18 @@ class AppTheme {
 
     final poppins = GoogleFonts.poppinsTextTheme();
     final notoDevanagari = GoogleFonts.notoSansDevanagariTextTheme();
+
+    // Avoid GoogleFonts.* inside WidgetState resolvers (nav rebuilds often).
+    const navSelected = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      color: AppColors.primary,
+    );
+    const navUnselected = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      color: AppColors.navInactive,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -146,14 +162,17 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.background,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.inputBorder, width: 1.5),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.inputBorder, width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -168,12 +187,9 @@ class AppTheme {
         indicatorColor: AppColors.orangeTint,
         labelPadding: const EdgeInsets.only(top: 4, bottom: 4),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.poppins(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.primary : AppColors.navInactive,
-          );
+          return states.contains(WidgetState.selected)
+              ? navSelected
+              : navUnselected;
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);

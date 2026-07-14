@@ -38,9 +38,11 @@ class ComplaintDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    StatusChip(status: complaint.status),
+                    ComplaintStatusRow(complaint: complaint),
                   ],
                 ),
+                const SizedBox(height: 10),
+                ComplaintAssetMetaRow(complaint: complaint),
                 const SizedBox(height: AppSpacing.screen),
                 const Row(
                   children: [

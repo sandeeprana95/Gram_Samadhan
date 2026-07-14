@@ -1,11 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../data/asset_types_data.dart';
 import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../screens/complaint_details_screen.dart';
 import '../screens/officer_action_screen.dart';
+import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import 'common_widgets.dart';
+
+/// Amrit Sarovar asset type id (Asset Survey seed).
+const String kAmritSarovarAssetTypeId = 'ast_34';
+
+bool isAmritSarovarComplaint(Complaint complaint) {
+  if (complaint.assetTypeId == kAmritSarovarAssetTypeId) return true;
+  final name = assetTypeById(complaint.assetTypeId ?? '')?.name ?? '';
+  return name.toLowerCase().contains('amrit sarovar');
+}
+
+String? complaintAssetTypeName(Complaint complaint) {
+  final id = complaint.assetTypeId;
+  if (id == null || id.isEmpty) return null;
+  return assetTypeById(id)?.name;
+}
+
+/// Village/GP label from linked survey instance, else complaint village.
+String complaintAssetLocationLabel(Complaint complaint) {
+  final instance = SurveyApi.getAssetInstance(complaint.assetInstanceId);
+  if (instance != null) {
+    return '${instance.gramPanchayat} GP, ${instance.district}';
+  }
+  return '${complaint.village} GP';
+}
 
 class ComplaintTile extends StatelessWidget {
   const ComplaintTile({
@@ -63,6 +90,103 @@ class StatusChip extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
+    );
+  }
+}
+
+/// Light-blue chip shown next to status for Amrit Sarovar complaints.
+class SarovarBadge extends StatelessWidget {
+  const SarovarBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.blueTint,
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+      child: const Text(
+        'SAROVAR',
+        style: TextStyle(
+          color: Color(0xFF1565C0),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// Status chip row, with optional SAROVAR badge for Amrit Sarovar issues.
+class ComplaintStatusRow extends StatelessWidget {
+  const ComplaintStatusRow({super.key, required this.complaint});
+
+  final Complaint complaint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        StatusChip(status: complaint.status),
+        if (isAmritSarovarComplaint(complaint)) const SarovarBadge(),
+      ],
+    );
+  }
+}
+
+/// Compact tagged meta row: asset type, location, date (no complainant name).
+class ComplaintAssetMetaRow extends StatelessWidget {
+  const ComplaintAssetMetaRow({super.key, required this.complaint});
+
+  final Complaint complaint;
+
+  @override
+  Widget build(BuildContext context) {
+    final assetName = complaintAssetTypeName(complaint);
+    final tags = <Widget>[
+      if (assetName != null)
+        _MetaTag(icon: Icons.sell_outlined, label: assetName),
+      _MetaTag(
+        icon: Icons.location_on_outlined,
+        label: complaintAssetLocationLabel(complaint),
+      ),
+      _MetaTag(icon: Icons.calendar_today_outlined, label: complaint.date),
+    ];
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 6,
+      children: tags,
+    );
+  }
+}
+
+class _MetaTag extends StatelessWidget {
+  const _MetaTag({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF757575)),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF616161),
+          ),
+        ),
+      ],
     );
   }
 }

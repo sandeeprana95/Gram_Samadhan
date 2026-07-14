@@ -9,11 +9,81 @@ import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
 import 'new_complaint_screen.dart';
 
-class MyComplaintsScreen extends StatelessWidget {
+enum _ComplaintFilter { all, active, inProgress, done, overdue }
+
+class MyComplaintsScreen extends StatefulWidget {
   const MyComplaintsScreen({super.key});
 
   @override
+  State<MyComplaintsScreen> createState() => _MyComplaintsScreenState();
+}
+
+class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
+  _ComplaintFilter _filter = _ComplaintFilter.all;
+
+  static const _tabs = <(_ComplaintFilter, String)>[
+    (_ComplaintFilter.all, 'All'),
+    (_ComplaintFilter.active, 'Active'),
+    (_ComplaintFilter.inProgress, 'In Progress'),
+    (_ComplaintFilter.done, 'Done'),
+    (_ComplaintFilter.overdue, 'Overdue'),
+  ];
+
+  List<Complaint> get _filtered {
+    return complaints.where(_matchesFilter).toList();
+  }
+
+  bool _matchesFilter(Complaint c) {
+    return switch (_filter) {
+      _ComplaintFilter.all => true,
+      _ComplaintFilter.active => c.status == ComplaintStatus.pending,
+      _ComplaintFilter.inProgress => c.status == ComplaintStatus.inProgress,
+      _ComplaintFilter.done => c.status == ComplaintStatus.resolved,
+      _ComplaintFilter.overdue => _isOverdue(c),
+    };
+  }
+
+  /// Open complaints older than 7 days are treated as overdue.
+  bool _isOverdue(Complaint c) {
+    if (c.status == ComplaintStatus.resolved ||
+        c.status == ComplaintStatus.rejected) {
+      return false;
+    }
+    final filed = _parseDate(c.date);
+    if (filed == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return today.difference(filed).inDays > 7;
+  }
+
+  DateTime? _parseDate(String date) {
+    const months = {
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
+    };
+    final parts = date.trim().split(RegExp(r'\s+'));
+    if (parts.length != 3) return null;
+    final day = int.tryParse(parts[0]);
+    final month = months[parts[1]];
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    return DateTime(year, month, day);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -62,31 +132,114 @@ class MyComplaintsScreen extends StatelessWidget {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screen,
-                    AppSpacing.screen + 4,
-                    AppSpacing.screen,
-                    AppSpacing.screen,
-                  ),
-                  itemCount: complaints.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.gap),
-                  itemBuilder: (context, index) {
-                    final complaint = complaints[index];
-                    return _MyComplaintCard(
-                      complaint: complaint,
-                      onTap: () => push(
-                        context,
-                        ComplaintDetailsScreen(complaint: complaint),
+                child: Column(
+                  children: [
+                    const SizedBox(height: AppSpacing.screen),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screen,
+                        ),
+                        itemCount: _tabs.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final (value, label) = _tabs[index];
+                          return _FilterPill(
+                            label: label,
+                            selected: _filter == value,
+                            onTap: () => setState(() => _filter = value),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No complaints in this filter',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: AppColors.mutedText,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.screen,
+                                AppSpacing.gap,
+                                AppSpacing.screen,
+                                AppSpacing.screen,
+                              ),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: AppSpacing.gap),
+                              itemBuilder: (context, index) {
+                                final complaint = filtered[index];
+                                return _MyComplaintCard(
+                                  complaint: complaint,
+                                  onTap: () => push(
+                                    context,
+                                    ComplaintDetailsScreen(
+                                      complaint: complaint,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: selected ? AppGradients.header : null,
+            color: selected ? null : AppColors.greyBg,
+            borderRadius: BorderRadius.circular(20),
+            border: selected
+                ? null
+                : Border.all(color: AppColors.border, width: 1),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : const Color(0xFF616161),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -216,15 +369,17 @@ class _MyComplaintCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  StatusChip(status: complaint.status),
+                  ComplaintStatusRow(complaint: complaint),
                 ],
               ),
               const SizedBox(height: 8),
+              ComplaintAssetMetaRow(complaint: complaint),
+              const SizedBox(height: 6),
               Text(
-                '${complaint.id} · ${_relativeDate(complaint.date)}',
+                complaint.id,
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: const Color(0xFF757575),
+                  fontSize: 12,
+                  color: const Color(0xFF9E9E9E),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -233,15 +388,5 @@ class _MyComplaintCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _relativeDate(String date) {
-    return switch (date) {
-      '06 Jul 2026' => '2 days ago',
-      '04 Jul 2026' => '4 days ago',
-      '29 Jun 2026' => '9 days ago',
-      '08 Jul 2026' => 'Today',
-      _ => date,
-    };
   }
 }

@@ -10,6 +10,8 @@ class Complaint {
     required this.status,
     required this.officer,
     required this.location,
+    this.assetTypeId,
+    this.assetInstanceId,
   });
 
   final String id;
@@ -20,6 +22,12 @@ class Complaint {
   final ComplaintStatus status;
   final String officer;
   final String location;
+
+  /// Linked AssetType id from Asset Survey feature.
+  final String? assetTypeId;
+
+  /// Linked surveyed asset instance (Survey id); null if free-text fallback.
+  final String? assetInstanceId;
 
   double? get latitude => _coordinate(0);
   double? get longitude => _coordinate(1);
