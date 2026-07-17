@@ -33,7 +33,7 @@ class _PanchayatAppState extends State<PanchayatApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'Panchayat Grievance',
+      title: 'Mhari Panchayat',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: SplashScreen(onComplete: _onSplashComplete),

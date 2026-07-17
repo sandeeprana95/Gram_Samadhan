@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/complaint.dart';
-import '../data/sample_data.dart';
 import '../navigation/app_navigation.dart';
+import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
@@ -14,12 +14,40 @@ import 'new_complaint_screen.dart';
 import 'notification_screen.dart';
 import 'asset_survey_screen.dart';
 
-class CitizenDashboardScreen extends StatelessWidget {
+class CitizenDashboardScreen extends StatefulWidget {
   const CitizenDashboardScreen({super.key});
 
   @override
+  State<CitizenDashboardScreen> createState() =>
+      _CitizenDashboardScreenState();
+}
+
+class _CitizenDashboardScreenState extends State<CitizenDashboardScreen> {
+  List<Complaint> _recentComplaints = [];
+  bool _loadingRecent = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentComplaints();
+  }
+
+  Future<void> _loadRecentComplaints() async {
+    setState(() => _loadingRecent = true);
+    try {
+      final complaints = await ComplaintApi.getMine();
+      if (!mounted) return;
+      setState(() => _recentComplaints = complaints.take(2).toList());
+    } catch (_) {
+      // Keep showing whatever we already had.
+    } finally {
+      if (mounted) setState(() => _loadingRecent = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final recentComplaints = complaints.take(2).toList();
+    final recentComplaints = _recentComplaints;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -87,7 +115,14 @@ class CitizenDashboardScreen extends StatelessWidget {
                         label: 'New Complaint',
                         color: AppColors.primary,
                         background: AppColors.orangeTint,
-                        onTap: () => push(context, const NewComplaintScreen()),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const NewComplaintScreen(),
+                            ),
+                          );
+                          _loadRecentComplaints();
+                        },
                       ),
                       _QuickActionCard(
                         icon: Icons.assignment_rounded,
@@ -122,6 +157,19 @@ class CitizenDashboardScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.gap),
+                  if (_loadingRecent)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (recentComplaints.isEmpty)
+                    Text(
+                      'No complaints filed yet',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: AppColors.mutedText,
+                      ),
+                    ),
                   ...recentComplaints.map(
                     (item) => _RecentComplaintRow(
                       complaint: item,

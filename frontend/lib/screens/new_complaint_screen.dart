@@ -1,11 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/asset_types_data.dart';
 import '../models/asset_type.dart';
-import '../models/complaint.dart';
 import '../models/survey.dart';
 import '../navigation/app_navigation.dart';
+import '../services/complaint_api.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
@@ -19,25 +24,16 @@ class NewComplaintScreen extends StatefulWidget {
 }
 
 class _NewComplaintScreenState extends State<NewComplaintScreen> {
-  static const _categories = [
-    'Damaged Road',
-    'Street Light',
-    'Drainage',
-    'Water Supply',
-    'Cleanliness',
-    'Illegal Encroachment',
-  ];
-
-  static const _villages = ['Bhondsi', 'Sohna', 'Badshahpur', 'Gurugram'];
-  static const _panchayats = [
+  List<String> _villages = ['Bhondsi', 'Sohna', 'Badshahpur', 'Gurugram'];
+  List<String> _panchayats = [
     'Bhondsi Gram Panchayat',
     'Sohna Gram Panchayat',
     'Badshahpur Gram Panchayat',
   ];
 
   String? _category;
-  String _village = _villages.first;
-  String _panchayat = _panchayats.first;
+  late String _village = _villages.first;
+  late String _panchayat = _panchayats.first;
   final _descriptionController = TextEditingController();
   final _assetLocationController = TextEditingController();
 
@@ -47,11 +43,23 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
   String? _assetInstanceId;
   bool _loadingTypes = true;
   bool _loadingInstances = false;
+  bool _submitting = false;
+
+  final ImagePicker _imagePicker = ImagePicker();
+  Uint8List? _photoBytes;
+
+  bool _detectingLocation = false;
+  double? _latitude;
+  double? _longitude;
+  String _locationLabel = 'No GPS captured yet — tap "GPS" above';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAssetTypes());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAssetTypes();
+      _detectLocation();
+    });
   }
 
   @override
@@ -130,63 +138,161 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
     return '$typeName - ${survey.gramPanchayat} GP';
   }
 
-  void _submit() {
-    if (_assetTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please select an asset type',
-            style: GoogleFonts.poppins(),
-          ),
+  Future<void> _detectLocation() async {
+    if (_detectingLocation) return;
+    setState(() => _detectingLocation = true);
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showMessage('कृपया अपने डिवाइस की लोकेशन सर्विस चालू करें');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage('स्थान दर्ज करने के लिए लोकेशन अनुमति आवश्यक है');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
         ),
       );
+
+      String? detectedVillage;
+      String? detectedArea;
+      try {
+        final placemarks = await Geocoding().placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          detectedVillage = (place.subLocality?.trim().isNotEmpty ?? false)
+              ? place.subLocality!.trim()
+              : place.locality?.trim();
+          detectedArea = (place.locality?.trim().isNotEmpty ?? false)
+              ? place.locality!.trim()
+              : place.subAdministrativeArea?.trim();
+        }
+      } catch (_) {
+        // Reverse geocoding unavailable; fall back to raw coordinates only.
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+
+        if (detectedVillage != null && detectedVillage.isNotEmpty) {
+          final existingVillage = _villages.firstWhere(
+            (v) => v.toLowerCase() == detectedVillage!.toLowerCase(),
+            orElse: () => detectedVillage!,
+          );
+          if (!_villages.contains(existingVillage)) {
+            _villages = [..._villages, existingVillage];
+          }
+          _village = existingVillage;
+
+          final derivedPanchayat = '$existingVillage Gram Panchayat';
+          final existingPanchayat = _panchayats.firstWhere(
+            (p) => p.toLowerCase().contains(existingVillage.toLowerCase()),
+            orElse: () => derivedPanchayat,
+          );
+          if (!_panchayats.contains(existingPanchayat)) {
+            _panchayats = [..._panchayats, existingPanchayat];
+          }
+          _panchayat = existingPanchayat;
+        }
+
+        final lat = position.latitude.toStringAsFixed(4);
+        final lng = position.longitude.toStringAsFixed(4);
+        final place = [
+          detectedVillage,
+          detectedArea,
+        ].where((p) => p != null && p.isNotEmpty).join(', ');
+        _locationLabel = place.isNotEmpty ? '$lat, $lng — $place' : '$lat, $lng';
+      });
+    } catch (_) {
+      _showMessage('लोकेशन प्राप्त नहीं हो सकी। कृपया पुनः प्रयास करें।');
+    } finally {
+      if (mounted) setState(() => _detectingLocation = false);
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      final photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (photo == null) return;
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
+      setState(() => _photoBytes = bytes);
+    } catch (_) {
+      _showMessage('फोटो लेने में समस्या हुई। कृपया कैमरा अनुमति जांचें।');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message, style: GoogleFonts.poppins())),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+
+    if (_assetTypeId == null) {
+      _showMessage('Please select an asset type');
       return;
     }
 
     final hasInstances = _assetInstances.isNotEmpty;
     if (hasInstances && _assetInstanceId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please select a specific asset',
-            style: GoogleFonts.poppins(),
-          ),
-        ),
-      );
+      _showMessage('Please select a specific asset');
       return;
     }
 
     if (!hasInstances && _assetLocationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please enter the asset location',
-            style: GoogleFonts.poppins(),
-          ),
-        ),
-      );
+      _showMessage('Please enter the asset location');
       return;
     }
 
-    final complaint = Complaint(
-      id: 'PG-2026-0149',
-      category: _category ?? 'General',
-      village: _village,
-      description: _descriptionController.text.trim().isEmpty
-          ? 'Complaint registered from mobile app.'
-          : _descriptionController.text.trim(),
-      date: '08 Jul 2026',
-      status: ComplaintStatus.pending,
-      officer: 'Not assigned',
-      location: '28.3521, 77.0642',
-      assetTypeId: _assetTypeId,
-      assetInstanceId: _assetInstanceId,
-    );
+    final latitude = _latitude ?? 28.3521;
+    final longitude = _longitude ?? 77.0642;
+    final description = _descriptionController.text.trim().isEmpty
+        ? 'Complaint registered from mobile app.'
+        : _descriptionController.text.trim();
 
-    pushReplacement(
-      context,
-      ComplaintSuccessScreen(complaint: complaint),
-    );
+    setState(() => _submitting = true);
+    try {
+      final complaint = await ComplaintApi.submit(
+        assetTypeId: _assetTypeId,
+        assetInstanceId: _assetInstanceId,
+        category: _category,
+        village: _village,
+        panchayat: _panchayat,
+        description: description,
+        latitude: latitude,
+        longitude: longitude,
+        photoBytes: _photoBytes,
+      );
+
+      if (!mounted) return;
+      pushReplacement(context, ComplaintSuccessScreen(complaint: complaint));
+    } on ComplaintApiException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -395,59 +501,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
                     ],
                   ],
                   const SizedBox(height: AppSpacing.gap),
-                  DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _category,
-                    hint: Text(
-                      '-- Optional --',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: AppColors.mutedText,
-                      ),
-                    ),
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF212121),
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Category (optional)',
-                      labelStyle: GoogleFonts.poppins(fontSize: 14),
-                      prefixIcon: const Icon(
-                        Icons.category_rounded,
-                        color: Color(0xFF9E9E9E),
-                      ),
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                        borderSide: const BorderSide(
-                          color: AppColors.border,
-                          width: 0.5,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                        borderSide: const BorderSide(
-                          color: AppColors.border,
-                          width: 0.5,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                        borderSide: const BorderSide(
-                          color: AppColors.primary,
-                          width: 1.2,
-                        ),
-                      ),
-                    ),
-                    items: [
-                      for (final item in _categories)
-                        DropdownMenuItem(value: item, child: Text(item)),
-                    ],
-                    onChanged: (value) => setState(() => _category = value),
-                  ),
-                  const SizedBox(height: AppSpacing.gap),
                   Row(
                     children: [
                       Expanded(
@@ -479,6 +532,17 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
                       ),
                     ],
                   ),
+                  if (_detectingLocation)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'आपका स्थान पता किया जा रहा है...',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: AppColors.mutedText,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.gap),
                   Text(
                     'Description',
@@ -532,23 +596,28 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.gap),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: _AttachmentTile(
                           icon: Icons.photo_camera_rounded,
                           label: 'Photo',
+                          onTap: _pickPhoto,
+                          thumbnailBytes: _photoBytes,
                         ),
                       ),
-                      SizedBox(width: AppSpacing.gap),
+                      const SizedBox(width: AppSpacing.gap),
                       Expanded(
                         child: _AttachmentTile(
                           icon: Icons.my_location_rounded,
                           label: 'GPS',
+                          onTap: _detectLocation,
+                          busy: _detectingLocation,
+                          done: _latitude != null,
                         ),
                       ),
-                      SizedBox(width: AppSpacing.gap),
-                      Expanded(
+                      const SizedBox(width: AppSpacing.gap),
+                      const Expanded(
                         child: _AttachmentTile(
                           icon: Icons.mic_rounded,
                           label: 'Voice note',
@@ -577,7 +646,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '28.3521, 77.0642 — Bhondsi, Gurugram',
+                            _locationLabel,
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: const Color(0xFF616161),
@@ -600,8 +669,8 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
               AppSpacing.screen,
             ),
             child: GradientButton(
-              onPressed: _submit,
-              label: 'Submit complaint',
+              onPressed: _submitting ? null : _submit,
+              label: _submitting ? 'Submitting...' : 'Submit complaint',
               fontSize: 16,
             ),
           ),
@@ -687,10 +756,21 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
 }
 
 class _AttachmentTile extends StatelessWidget {
-  const _AttachmentTile({required this.icon, required this.label});
+  const _AttachmentTile({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.busy = false,
+    this.done = false,
+    this.thumbnailBytes,
+  });
 
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
+  final bool busy;
+  final bool done;
+  final Uint8List? thumbnailBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -700,27 +780,63 @@ class _AttachmentTile extends StatelessWidget {
         radius: AppRadius.button,
       ),
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.button),
         child: Container(
           height: 88,
           alignment: Alignment.center,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.primary, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF616161),
+          child: thumbnailBytes != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.button - 2),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.memory(thumbnailBytes!, fit: BoxFit.cover),
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.primary,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : busy
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      done ? Icons.check_circle_rounded : icon,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF616161),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

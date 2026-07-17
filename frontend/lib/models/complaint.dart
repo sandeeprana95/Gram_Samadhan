@@ -12,6 +12,8 @@ class Complaint {
     required this.location,
     this.assetTypeId,
     this.assetInstanceId,
+    this.photoUrl,
+    this.createdAt,
   });
 
   final String id;
@@ -28,6 +30,12 @@ class Complaint {
 
   /// Linked surveyed asset instance (Survey id); null if free-text fallback.
   final String? assetInstanceId;
+
+  /// Absolute URL of the photo attached at submission time, if any.
+  final String? photoUrl;
+
+  /// Exact submission timestamp from the server, used for the timeline.
+  final DateTime? createdAt;
 
   double? get latitude => _coordinate(0);
   double? get longitude => _coordinate(1);

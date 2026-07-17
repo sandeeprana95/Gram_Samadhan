@@ -1,11 +1,11 @@
 {
-    "name": "Panchayat Grievance",
-    "short_name": "Panchayat",
+    "name": "Mhari Panchayat",
+    "short_name": "Mhari Panchayat",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Panchayat Grievance - Survey, complaint and field redressal system.",
+    "background_color": "#1565C0",
+    "theme_color": "#1565C0",
+    "description": "Mhari Panchayat - Survey, complaint and field redressal system.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

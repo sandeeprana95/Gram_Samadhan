@@ -3,3 +3,7 @@ node_modules
 .env
 
 /generated/prisma
+
+# Uploaded complaint photos (runtime data, not source)
+/uploads/complaints/*
+!/uploads/complaints/.gitkeep

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../data/sample_data.dart';
 import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
+import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
@@ -20,6 +20,9 @@ class MyComplaintsScreen extends StatefulWidget {
 
 class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   _ComplaintFilter _filter = _ComplaintFilter.all;
+  List<Complaint> _complaints = [];
+  bool _loading = true;
+  String? _error;
 
   static const _tabs = <(_ComplaintFilter, String)>[
     (_ComplaintFilter.all, 'All'),
@@ -29,8 +32,31 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     (_ComplaintFilter.overdue, 'Overdue'),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final complaints = await ComplaintApi.getMine();
+      if (!mounted) return;
+      setState(() => _complaints = complaints);
+    } on ComplaintApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   List<Complaint> get _filtered {
-    return complaints.where(_matchesFilter).toList();
+    return _complaints.where(_matchesFilter).toList();
   }
 
   bool _matchesFilter(Complaint c) {
@@ -109,7 +135,14 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
           ),
           child: FloatingActionButton(
             heroTag: 'my_complaints_fab',
-            onPressed: () => push(context, const NewComplaintScreen()),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NewComplaintScreen(),
+                ),
+              );
+              _load();
+            },
             backgroundColor: Colors.transparent,
             elevation: 0,
             highlightElevation: 0,
@@ -155,39 +188,59 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                       ),
                     ),
                     Expanded(
-                      child: filtered.isEmpty
-                          ? Center(
-                              child: Text(
-                                'No complaints in this filter',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: AppColors.mutedText,
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _error != null && _complaints.isEmpty
+                              ? _ErrorState(message: _error!, onRetry: _load)
+                              : RefreshIndicator(
+                                  onRefresh: _load,
+                                  child: filtered.isEmpty
+                                      ? ListView(
+                                          children: [
+                                            SizedBox(
+                                              height:
+                                                  MediaQuery.sizeOf(context)
+                                                          .height *
+                                                      0.3,
+                                              child: Center(
+                                                child: Text(
+                                                  'No complaints in this filter',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                    color:
+                                                        AppColors.mutedText,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : ListView.separated(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            AppSpacing.screen,
+                                            AppSpacing.gap,
+                                            AppSpacing.screen,
+                                            AppSpacing.screen,
+                                          ),
+                                          itemCount: filtered.length,
+                                          separatorBuilder: (_, __) =>
+                                              const SizedBox(
+                                            height: AppSpacing.gap,
+                                          ),
+                                          itemBuilder: (context, index) {
+                                            final complaint = filtered[index];
+                                            return _MyComplaintCard(
+                                              complaint: complaint,
+                                              onTap: () => push(
+                                                context,
+                                                ComplaintDetailsScreen(
+                                                  complaint: complaint,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
                                 ),
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(
-                                AppSpacing.screen,
-                                AppSpacing.gap,
-                                AppSpacing.screen,
-                                AppSpacing.screen,
-                              ),
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: AppSpacing.gap),
-                              itemBuilder: (context, index) {
-                                final complaint = filtered[index];
-                                return _MyComplaintCard(
-                                  complaint: complaint,
-                                  onTap: () => push(
-                                    context,
-                                    ComplaintDetailsScreen(
-                                      complaint: complaint,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
                     ),
                   ],
                 ),
@@ -195,6 +248,46 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.screen),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 40,
+              color: Color(0xFF9E9E9E),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.mutedText,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

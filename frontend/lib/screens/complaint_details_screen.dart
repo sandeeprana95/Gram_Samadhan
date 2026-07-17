@@ -2,17 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/complaint.dart';
+import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 
-class ComplaintDetailsScreen extends StatelessWidget {
+class ComplaintDetailsScreen extends StatefulWidget {
   const ComplaintDetailsScreen({super.key, required this.complaint});
 
   final Complaint complaint;
 
   @override
+  State<ComplaintDetailsScreen> createState() =>
+      _ComplaintDetailsScreenState();
+}
+
+class _ComplaintDetailsScreenState extends State<ComplaintDetailsScreen> {
+  late Complaint _complaint;
+  bool _refreshing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _complaint = widget.complaint;
+    _refresh();
+  }
+
+  /// Re-fetches the complaint from the backend so this screen always shows
+  /// the data actually stored on the server, not just what was submitted
+  /// locally. Falls back to the data we already have (e.g. demo complaints
+  /// with no matching server record) if the request fails.
+  Future<void> _refresh() async {
+    try {
+      final fresh = await ComplaintApi.getById(_complaint.id);
+      if (!mounted) return;
+      setState(() => _complaint = fresh);
+    } catch (_) {
+      // Keep the data we already have.
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final complaint = _complaint;
     final officerParts = _officerParts(complaint.officer);
     final timeline = _timelineStages(complaint);
 
@@ -24,6 +58,11 @@ class ComplaintDetailsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.screen),
               children: [
+                if (_refreshing)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: AppSpacing.gap),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -44,16 +83,17 @@ class ComplaintDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 ComplaintAssetMetaRow(complaint: complaint),
                 const SizedBox(height: AppSpacing.screen),
-                const Row(
+                Row(
                   children: [
                     Expanded(
                       child: _PhotoPlaceholder(
                         label: 'Before Photo',
                         icon: Icons.photo_camera_rounded,
+                        imageUrl: complaint.photoUrl,
                       ),
                     ),
-                    SizedBox(width: AppSpacing.gap),
-                    Expanded(
+                    const SizedBox(width: AppSpacing.gap),
+                    const Expanded(
                       child: _PhotoPlaceholder(
                         label: 'After Photo',
                         icon: Icons.add_photo_alternate_rounded,
@@ -129,11 +169,14 @@ class ComplaintDetailsScreen extends StatelessWidget {
   List<_TimelineData> _timelineStages(Complaint complaint) {
     final assigned = complaint.status != ComplaintStatus.pending;
     final siteVisitDone = complaint.status == ComplaintStatus.resolved;
+    final registeredAt = complaint.createdAt != null
+        ? '${complaint.date} · ${_formatTime(complaint.createdAt!)}'
+        : '${complaint.date} · 10:24 AM';
 
     return [
       _TimelineData(
         title: 'Registered',
-        timestamp: '${complaint.date} · 10:24 AM',
+        timestamp: registeredAt,
         done: true,
       ),
       _TimelineData(
@@ -154,6 +197,14 @@ class ComplaintDetailsScreen extends StatelessWidget {
       ),
     ];
   }
+
+  String _formatTime(DateTime dateTime) {
+    final hour24 = dateTime.hour;
+    final period = hour24 >= 12 ? 'PM' : 'AM';
+    final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour12:$minute $period';
+  }
 }
 
 class _TimelineData {
@@ -169,35 +220,52 @@ class _TimelineData {
 }
 
 class _PhotoPlaceholder extends StatelessWidget {
-  const _PhotoPlaceholder({required this.label, required this.icon});
+  const _PhotoPlaceholder({
+    required this.label,
+    required this.icon,
+    this.imageUrl,
+  });
 
   final String label;
   final IconData icon;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = imageUrl;
     return Container(
       height: 120,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.greyBg,
         borderRadius: BorderRadius.circular(AppRadius.button),
         border: Border.all(color: AppColors.border, width: 0.5),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 32, color: const Color(0xFF9E9E9E)),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF757575),
-            ),
+      child: url != null
+          ? Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _placeholderContent(),
+            )
+          : _placeholderContent(),
+    );
+  }
+
+  Widget _placeholderContent() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 32, color: const Color(0xFF9E9E9E)),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF757575),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

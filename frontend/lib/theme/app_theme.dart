@@ -9,6 +9,10 @@ class AppColors {
   static const background = Color(0xFFFFFFFF);
   static const border = Color(0xFFE0E0E0);
 
+  /// Brand blue used on the splash/login screens (Mhari Panchayat branding).
+  static const brandBlue = Color(0xFF1565C0);
+  static const brandBlueTint = Color(0xFFE3F2FD);
+
   static const greyBg = Color(0xFFF5F5F5);
   static const orangeTint = Color(0xFFFFF3E0);
   static const greenTint = Color(0xFFE8F5E9);

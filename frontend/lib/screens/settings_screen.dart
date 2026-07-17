@@ -88,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 28),
                     Center(
                       child: Text(
-                        'Panchayat Grievance · v1.0.0',
+                        'Mhari Panchayat · v1.0.0',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: const Color(0xFF9E9E9E),

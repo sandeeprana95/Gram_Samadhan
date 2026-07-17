@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,9 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_role.dart';
 import '../navigation/app_navigation.dart';
 import '../navigation/role_navigation.dart';
+import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import 'splash_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,9 +19,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  UserRole _role = UserRole.citizen;
+  bool _citizenTab = true;
+  UserRole _staffRole = UserRole.officer;
   bool _otpSent = false;
-  bool _showAltOptions = false;
+  bool _isSubmitting = false;
 
   final _mobileController = TextEditingController();
   final _userIdController = TextEditingController();
@@ -49,10 +52,25 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _continue() async {
-    await AuthService.saveLogin(role: _role);
+  void _selectTab(bool citizen) {
+    if (_citizenTab == citizen) return;
+    setState(() {
+      _citizenTab = citizen;
+      _otpSent = false;
+    });
+  }
+
+  Future<void> _continueAsStaff() async {
+    await AuthService.saveLogin(role: _staffRole, token: null);
     if (!mounted) return;
-    pushReplacement(context, dashboardForRole(_role));
+    pushReplacement(context, dashboardForRole(_staffRole));
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message, style: GoogleFonts.notoSansDevanagari())),
+    );
   }
 
   void _onOtpChanged(int index, String value) {
@@ -64,20 +82,38 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {});
   }
 
-  void _onCitizenPrimaryTap() {
-    if (!_otpSent) {
-      setState(() => _otpSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'ओटीपी भेजा गया',
-            style: GoogleFonts.notoSansDevanagari(),
-          ),
-        ),
-      );
+  Future<void> _onCitizenPrimaryTap() async {
+    if (_isSubmitting) return;
+
+    final mobile = _mobileController.text.trim();
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(mobile)) {
+      _showMessage('कृपया 10 अंकों का सही मोबाइल नंबर दर्ज करें');
       return;
     }
-    _continue();
+
+    setState(() => _isSubmitting = true);
+    try {
+      if (!_otpSent) {
+        final result = await AuthApi.sendOtp(mobile);
+        if (!mounted) return;
+        setState(() => _otpSent = true);
+        _showMessage(result.message);
+      } else {
+        final otp = _otpControllers.map((c) => c.text.trim()).join();
+        if (otp.length != 4) {
+          _showMessage('कृपया पूरा ओटीपी दर्ज करें');
+          return;
+        }
+        final result = await AuthApi.verifyOtp(mobile, otp);
+        await AuthService.saveLogin(role: UserRole.citizen, token: result.token);
+        if (!mounted) return;
+        pushReplacement(context, dashboardForRole(UserRole.citizen));
+      }
+    } on AuthApiException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -86,157 +122,152 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          child: SizedBox(
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _TopSection(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      const _WelcomeSection(),
-                      const SizedBox(height: 20),
-                      if (_role == UserRole.citizen) ...[
-                        _buildMobileField(),
-                        if (_otpSent) ...[
-                          const SizedBox(height: 16),
-                          _buildOtpRow(),
-                        ],
-                        const SizedBox(height: 16),
-                        GradientButton(
-                          onPressed: _onCitizenPrimaryTap,
-                          label: _otpSent
-                              ? 'ओटीपी सत्यापित करें'
-                              : 'ओटीपी भेजें',
-                          trailingIcon: _otpSent
-                              ? Icons.verified_rounded
-                              : Icons.send_rounded,
-                          labelStyle: GoogleFonts.notoSansDevanagari(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      const _OrDivider(),
-                      const SizedBox(height: 16),
-                      _AltOptionsTile(
-                        expanded: _showAltOptions,
-                        onTap: () =>
-                            setState(() => _showAltOptions = !_showAltOptions),
-                      ),
-                      if (_showAltOptions) ...[
-                        const SizedBox(height: 14),
-                        _RolePicker(
-                          selected: _role,
-                          onChanged: (role) => setState(() => _role = role),
-                        ),
-                        if (_role != UserRole.citizen) ...[
-                          const SizedBox(height: 14),
-                          _buildStaffField(
-                            label: 'यूज़र ID',
-                            icon: Icons.person_rounded,
-                            controller: _userIdController,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildStaffField(
-                            label: 'पासवर्ड',
-                            icon: Icons.lock_rounded,
-                            controller: _passwordController,
-                            obscure: true,
-                          ),
-                          const SizedBox(height: 16),
-                          GradientButton(
-                            onPressed: _continue,
-                            label: 'लॉगिन करें',
-                            icon: Icons.login_rounded,
-                            labelStyle: GoogleFonts.notoSansDevanagari(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
-                      const SizedBox(height: 24),
-                      const _FeatureIconsRow(),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 12),
+              const Center(child: MhariPanchayatLogo(size: 64)),
+              const SizedBox(height: 12),
+              Text(
+                'म्हारी पंचायत',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansDevanagari(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.secondary,
                 ),
-                const _VillageIllustration(),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14, top: 6),
-                  child: Text(
-                    '© 2026 पंचायत समाधान। सभी अधिकार सुरक्षित।',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.notoSansDevanagari(
-                      fontSize: 10,
-                      color: AppColors.mutedText,
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'लॉगिन',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansDevanagari(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF212121),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 20),
+              _RoleTabs(isCitizen: _citizenTab, onChanged: _selectTab),
+              const SizedBox(height: 22),
+              if (_citizenTab) ..._buildCitizenForm() else ..._buildStaffForm(),
+              const SizedBox(height: 28),
+              _TermsFooter(onLinkTap: _showMessage),
+              const SizedBox(height: 12),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMobileField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'मोबाइल नंबर',
-          style: GoogleFonts.notoSansDevanagari(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF212121),
-          ),
+  List<Widget> _buildCitizenForm() {
+    return [
+      Text(
+        'मोबाइल नंबर से लॉगिन करें',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.notoSansDevanagari(
+          fontSize: 13,
+          color: AppColors.secondaryText,
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _mobileController,
-          keyboardType: TextInputType.phone,
-          style: GoogleFonts.notoSansDevanagari(fontSize: 14),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(
-              Icons.phone_android_rounded,
-              color: AppColors.mutedText,
-            ),
-            hintText: 'अपना मोबाइल नंबर दर्ज करें',
-            hintStyle: GoogleFonts.notoSansDevanagari(
-              fontSize: 13,
-              color: AppColors.mutedText,
-            ),
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.border, width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.border, width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-          ),
-        ),
+      ),
+      const SizedBox(height: 14),
+      _buildMobileField(),
+      if (_otpSent) ...[
+        const SizedBox(height: 16),
+        _buildOtpRow(),
       ],
+      const SizedBox(height: 18),
+      _PrimaryButton(
+        onPressed: _isSubmitting ? null : _onCitizenPrimaryTap,
+        loading: _isSubmitting,
+        label: _otpSent ? 'ओटीपी सत्यापित करें' : 'ओटीपी भेजें',
+        icon: _otpSent ? Icons.verified_rounded : Icons.send_rounded,
+      ),
+    ];
+  }
+
+  List<Widget> _buildStaffForm() {
+    return [
+      Text(
+        'यूज़र ID और पासवर्ड से लॉगिन करें',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.notoSansDevanagari(
+          fontSize: 13,
+          color: AppColors.secondaryText,
+        ),
+      ),
+      const SizedBox(height: 14),
+      _DepartmentRolePicker(
+        selected: _staffRole,
+        onChanged: (role) => setState(() => _staffRole = role),
+      ),
+      const SizedBox(height: 14),
+      _buildStaffField(
+        label: 'यूज़र ID',
+        icon: Icons.person_rounded,
+        controller: _userIdController,
+      ),
+      const SizedBox(height: 12),
+      _buildStaffField(
+        label: 'पासवर्ड',
+        icon: Icons.lock_rounded,
+        controller: _passwordController,
+        obscure: true,
+      ),
+      const SizedBox(height: 18),
+      _PrimaryButton(
+        onPressed: _continueAsStaff,
+        loading: false,
+        label: 'लॉगिन करें',
+        icon: Icons.login_rounded,
+      ),
+    ];
+  }
+
+  Widget _buildMobileField() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 14),
+          Text(
+            '+91',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF212121),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(width: 1, height: 24, color: AppColors.border),
+          Expanded(
+            child: TextField(
+              controller: _mobileController,
+              keyboardType: TextInputType.phone,
+              maxLength: 10,
+              style: GoogleFonts.notoSansDevanagari(fontSize: 14),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                hintText: 'मोबाइल नंबर दर्ज करें',
+                hintStyle: GoogleFonts.notoSansDevanagari(
+                  fontSize: 13,
+                  color: AppColors.mutedText,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -276,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: focused || filled
-                      ? AppColors.primary
+                      ? AppColors.brandBlue
                       : AppColors.border,
                   width: focused ? 2 : 1.5,
                 ),
@@ -284,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: AppColors.primary, width: 2),
+                    const BorderSide(color: AppColors.brandBlue, width: 2),
               ),
             ),
           ),
@@ -334,7 +365,7 @@ class _LoginScreenState extends State<LoginScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
+                  const BorderSide(color: AppColors.brandBlue, width: 1.5),
             ),
           ),
         ),
@@ -343,76 +374,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _TopSection extends StatelessWidget {
-  const _TopSection();
+class _RoleTabs extends StatelessWidget {
+  const _RoleTabs({required this.isCitizen, required this.onChanged});
+
+  final bool isCitizen;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.greyBg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF37474F), width: 1.5),
-              ),
-              child: const Icon(
-                Icons.home_work_outlined,
-                size: 18,
-                color: Color(0xFF37474F),
-              ),
+          Expanded(
+            child: _TabButton(
+              label: 'नागरिक',
+              selected: isCitizen,
+              onTap: () => onChanged(true),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppGradients.header,
-                ),
-                child: const Icon(
-                  Icons.home_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 10),
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.notoSansDevanagari(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  children: const [
-                    TextSpan(
-                      text: 'पंचायत',
-                      style: TextStyle(color: AppColors.secondary),
-                    ),
-                    TextSpan(
-                      text: 'समाधान',
-                      style: TextStyle(color: AppColors.primary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'आपकी समस्या, हमारा समाधान',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.notoSansDevanagari(
-              fontSize: 12,
-              color: AppColors.secondaryText,
+          Expanded(
+            child: _TabButton(
+              label: 'विभाग',
+              selected: !isCitizen,
+              onTap: () => onChanged(false),
             ),
           ),
         ],
@@ -421,102 +410,35 @@ class _TopSection extends StatelessWidget {
   }
 }
 
-class _WelcomeSection extends StatelessWidget {
-  const _WelcomeSection();
+class _TabButton extends StatelessWidget {
+  const _TabButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          'स्वागत है!',
-          style: GoogleFonts.notoSansDevanagari(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF212121),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'कृपया लॉगिन करके जारी रखें',
-          style: GoogleFonts.notoSansDevanagari(
-            fontSize: 12,
-            color: AppColors.secondaryText,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'या',
-            style: GoogleFonts.notoSansDevanagari(
-              fontSize: 12,
-              color: AppColors.mutedText,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: AppColors.border, thickness: 1)),
-      ],
-    );
-  }
-}
-
-class _AltOptionsTile extends StatelessWidget {
-  const _AltOptionsTile({required this.expanded, required this.onTap});
-
-  final bool expanded;
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border, width: 1.5),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.groups_rounded,
-                color: AppColors.secondaryText,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'अन्य विकल्प (Officer / Admin)',
-                  style: GoogleFonts.notoSansDevanagari(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF212121),
-                  ),
-                ),
-              ),
-              Icon(
-                expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                color: AppColors.mutedText,
-              ),
-            ],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.brandBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.notoSansDevanagari(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.secondaryText,
           ),
         ),
       ),
@@ -524,8 +446,8 @@ class _AltOptionsTile extends StatelessWidget {
   }
 }
 
-class _RolePicker extends StatelessWidget {
-  const _RolePicker({required this.selected, required this.onChanged});
+class _DepartmentRolePicker extends StatelessWidget {
+  const _DepartmentRolePicker({required this.selected, required this.onChanged});
 
   final UserRole selected;
   final ValueChanged<UserRole> onChanged;
@@ -573,10 +495,10 @@ class _RoleChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.orangeTint : AppColors.greyBg,
+          color: selected ? AppColors.brandBlueTint : AppColors.greyBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? AppColors.brandBlue : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -586,7 +508,7 @@ class _RoleChip extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: selected ? AppColors.primary : AppColors.secondaryText,
+            color: selected ? AppColors.brandBlue : AppColors.secondaryText,
           ),
         ),
       ),
@@ -594,189 +516,120 @@ class _RoleChip extends StatelessWidget {
   }
 }
 
-class _FeatureIconsRow extends StatelessWidget {
-  const _FeatureIconsRow();
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({
+    required this.onPressed,
+    required this.label,
+    required this.icon,
+    required this.loading,
+  });
 
-  static const _items = [
-    (
-      icon: Icons.visibility_rounded,
-      label: 'पारदर्शिता',
-      bg: AppColors.greenTint,
-      fg: AppColors.secondary,
-    ),
-    (
-      icon: Icons.bolt_rounded,
-      label: 'त्वरित समाधान',
-      bg: AppColors.orangeTint,
-      fg: AppColors.primary,
-    ),
-    (
-      icon: Icons.shield_rounded,
-      label: 'सुरक्षित',
-      bg: AppColors.greenTint,
-      fg: AppColors.secondary,
-    ),
-    (
-      icon: Icons.volunteer_activism_rounded,
-      label: 'जन सेवा',
-      bg: AppColors.orangeTint,
-      fg: AppColors.primary,
-    ),
-  ];
+  final VoidCallback? onPressed;
+  final String label;
+  final IconData icon;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final item in _items)
-          Expanded(
-            child: Column(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: AppColors.brandBlue,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: item.bg,
-                    shape: BoxShape.circle,
+                if (loading) ...[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
                   ),
-                  child: Icon(item.icon, color: item.fg, size: 20),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  item.label,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.notoSansDevanagari(
-                    fontSize: 9,
-                    color: AppColors.secondaryText,
-                    height: 1.2,
+                  const SizedBox(width: 10),
+                  Text(
+                    'कृपया प्रतीक्षा करें...',
+                    style: GoogleFonts.notoSansDevanagari(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                ] else ...[
+                  Text(
+                    label,
+                    style: GoogleFonts.notoSansDevanagari(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(icon, color: Colors.white, size: 20),
+                ],
               ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
 
-class _VillageIllustration extends StatelessWidget {
-  const _VillageIllustration();
+
+class _TermsFooter extends StatelessWidget {
+  const _TermsFooter({required this.onLinkTap});
+
+  final ValueChanged<String> onLinkTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 150,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _VillageScenePainter(),
-        size: Size.infinite,
+    final baseStyle = GoogleFonts.notoSansDevanagari(
+      fontSize: 11,
+      color: AppColors.secondaryText,
+      height: 1.6,
+    );
+    final linkStyle = GoogleFonts.notoSansDevanagari(
+      fontSize: 11,
+      color: AppColors.brandBlue,
+      fontWeight: FontWeight.w700,
+      decoration: TextDecoration.underline,
+      decorationColor: AppColors.brandBlue,
+      height: 1.6,
+    );
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          const TextSpan(text: 'जारी रखते हुए, आप हमारी '),
+          TextSpan(
+            text: 'सेवा की शर्तें',
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => onLinkTap('सेवा की शर्तें जल्द ही उपलब्ध होंगी'),
+          ),
+          const TextSpan(text: ' और\n'),
+          TextSpan(
+            text: 'गोपनीयता नीति',
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => onLinkTap('गोपनीयता नीति जल्द ही उपलब्ध होगी'),
+          ),
+          const TextSpan(text: ' से सहमत हैं।'),
+        ],
       ),
     );
   }
-}
-
-class _VillageScenePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Rolling hills
-    final hillPaint1 = Paint()..color = const Color(0xFFA5D6A7);
-    final hillPaint2 = Paint()..color = const Color(0xFF81C784);
-
-    final hill1 = Path()
-      ..moveTo(0, h * 0.72)
-      ..quadraticBezierTo(w * 0.25, h * 0.55, w * 0.5, h * 0.68)
-      ..quadraticBezierTo(w * 0.75, h * 0.82, w, h * 0.65)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(hill1, hillPaint1);
-
-    final hill2 = Path()
-      ..moveTo(0, h * 0.82)
-      ..quadraticBezierTo(w * 0.35, h * 0.68, w * 0.65, h * 0.78)
-      ..quadraticBezierTo(w * 0.85, h * 0.88, w, h * 0.75)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(hill2, hillPaint2);
-
-    // Sun
-    canvas.drawCircle(
-      Offset(w * 0.15, h * 0.22),
-      14,
-      Paint()..color = const Color(0xFFFFCA28),
-    );
-
-    // Winding path
-    final pathPaint = Paint()
-      ..color = const Color(0xFFD7CCC8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round;
-    final path = Path()
-      ..moveTo(w * 0.1, h * 0.88)
-      ..quadraticBezierTo(w * 0.35, h * 0.72, w * 0.5, h * 0.8)
-      ..quadraticBezierTo(w * 0.7, h * 0.9, w * 0.88, h * 0.78);
-    canvas.drawPath(path, pathPaint);
-
-    // Tree
-    final trunkPaint = Paint()..color = const Color(0xFF8D6E63);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(w * 0.5, h * 0.62),
-          width: 10,
-          height: 28,
-        ),
-        const Radius.circular(3),
-      ),
-      trunkPaint,
-    );
-    canvas.drawCircle(
-      Offset(w * 0.5, h * 0.48),
-      22,
-      Paint()..color = const Color(0xFF66BB6A),
-    );
-
-    // Houses
-    _drawHouse(canvas, Offset(w * 0.28, h * 0.58), 0.9);
-    _drawHouse(canvas, Offset(w * 0.72, h * 0.62), 0.75);
-  }
-
-  void _drawHouse(Canvas canvas, Offset base, double scale) {
-    final bodyW = 34.0 * scale;
-    final bodyH = 26.0 * scale;
-
-    final body = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(base.dx, base.dy),
-        width: bodyW,
-        height: bodyH,
-      ),
-      const Radius.circular(2),
-    );
-    canvas.drawRRect(body, Paint()..color = const Color(0xFFFFF8E1));
-
-    final roof = Path()
-      ..moveTo(base.dx - bodyW * 0.6, base.dy - bodyH * 0.45)
-      ..lineTo(base.dx, base.dy - bodyH * 0.95)
-      ..lineTo(base.dx + bodyW * 0.6, base.dy - bodyH * 0.45)
-      ..close();
-    canvas.drawPath(roof, Paint()..color = const Color(0xFF8D6E63));
-
-    canvas.drawRect(
-      Rect.fromCenter(
-        center: Offset(base.dx, base.dy + bodyH * 0.1),
-        width: 10 * scale,
-        height: 12 * scale,
-      ),
-      Paint()..color = const Color(0xFF5D4037),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
