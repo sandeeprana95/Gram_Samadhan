@@ -23,6 +23,10 @@ class _LoginScreenState extends State<LoginScreen> {
   UserRole _staffRole = UserRole.officer;
   bool _otpSent = false;
   bool _isSubmitting = false;
+  bool _isEnglish = false;
+
+  /// Returns [english] when the English toggle is active, else [hindi].
+  String _t(String hindi, String english) => _isEnglish ? english : hindi;
 
   final _mobileController = TextEditingController();
   final _userIdController = TextEditingController();
@@ -87,7 +91,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final mobile = _mobileController.text.trim();
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(mobile)) {
-      _showMessage('कृपया 10 अंकों का सही मोबाइल नंबर दर्ज करें');
+      _showMessage(_t(
+        'कृपया 10 अंकों का सही मोबाइल नंबर दर्ज करें',
+        'Please enter a valid 10-digit mobile number',
+      ));
       return;
     }
 
@@ -109,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         final otp = _otpControllers.map((c) => c.text.trim()).join();
         if (otp.length != 4) {
-          _showMessage('कृपया पूरा ओटीपी दर्ज करें');
+          _showMessage(_t('कृपया पूरा ओटीपी दर्ज करें', 'Please enter the complete OTP'));
           return;
         }
         final result = await AuthApi.verifyOtp(mobile, otp);
@@ -134,7 +141,15 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.topRight,
+                child: _LanguageToggle(
+                  isEnglish: _isEnglish,
+                  onChanged: (value) => setState(() => _isEnglish = value),
+                ),
+              ),
+              const SizedBox(height: 4),
               const Center(child: MhariPanchayatLogo(size: 64)),
               const SizedBox(height: 12),
               Text(
@@ -148,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'लॉगिन',
+                _t('लॉगिन', 'Login'),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.notoSansDevanagari(
                   fontSize: 24,
@@ -157,11 +172,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              _RoleTabs(isCitizen: _citizenTab, onChanged: _selectTab),
+              _RoleTabs(
+                isCitizen: _citizenTab,
+                onChanged: _selectTab,
+                citizenLabel: _t('नागरिक', 'Citizen'),
+                departmentLabel: _t('विभाग', 'Department'),
+              ),
               const SizedBox(height: 22),
               if (_citizenTab) ..._buildCitizenForm() else ..._buildStaffForm(),
               const SizedBox(height: 28),
-              _TermsFooter(onLinkTap: _showMessage),
+              _TermsFooter(onLinkTap: _showMessage, isEnglish: _isEnglish),
               const SizedBox(height: 12),
             ],
           ),
@@ -173,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
   List<Widget> _buildCitizenForm() {
     return [
       Text(
-        'मोबाइल नंबर से लॉगिन करें',
+        _t('मोबाइल नंबर से लॉगिन करें', 'Login with mobile number'),
         textAlign: TextAlign.center,
         style: GoogleFonts.notoSansDevanagari(
           fontSize: 13,
@@ -190,7 +210,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _PrimaryButton(
         onPressed: _isSubmitting ? null : _onCitizenPrimaryTap,
         loading: _isSubmitting,
-        label: _otpSent ? 'ओटीपी सत्यापित करें' : 'ओटीपी भेजें',
+        loadingLabel: _t('कृपया प्रतीक्षा करें...', 'Please wait...'),
+        label: _otpSent
+            ? _t('ओटीपी सत्यापित करें', 'Verify OTP')
+            : _t('ओटीपी भेजें', 'Send OTP'),
         icon: _otpSent ? Icons.verified_rounded : Icons.send_rounded,
       ),
     ];
@@ -199,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
   List<Widget> _buildStaffForm() {
     return [
       Text(
-        'यूज़र ID और पासवर्ड से लॉगिन करें',
+        _t('यूज़र ID और पासवर्ड से लॉगिन करें', 'Login with User ID and Password'),
         textAlign: TextAlign.center,
         style: GoogleFonts.notoSansDevanagari(
           fontSize: 13,
@@ -213,13 +236,13 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       const SizedBox(height: 14),
       _buildStaffField(
-        label: 'यूज़र ID',
+        label: _t('यूज़र ID', 'User ID'),
         icon: Icons.person_rounded,
         controller: _userIdController,
       ),
       const SizedBox(height: 12),
       _buildStaffField(
-        label: 'पासवर्ड',
+        label: _t('पासवर्ड', 'Password'),
         icon: Icons.lock_rounded,
         controller: _passwordController,
         obscure: true,
@@ -228,7 +251,8 @@ class _LoginScreenState extends State<LoginScreen> {
       _PrimaryButton(
         onPressed: _continueAsStaff,
         loading: false,
-        label: 'लॉगिन करें',
+        loadingLabel: _t('कृपया प्रतीक्षा करें...', 'Please wait...'),
+        label: _t('लॉगिन करें', 'Login'),
         icon: Icons.login_rounded,
       ),
     ];
@@ -269,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 disabledBorder: InputBorder.none,
-                hintText: 'मोबाइल नंबर दर्ज करें',
+                hintText: _t('मोबाइल नंबर दर्ज करें', 'Enter mobile number'),
                 hintStyle: GoogleFonts.notoSansDevanagari(
                   fontSize: 13,
                   color: AppColors.mutedText,
@@ -387,10 +411,17 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _RoleTabs extends StatelessWidget {
-  const _RoleTabs({required this.isCitizen, required this.onChanged});
+  const _RoleTabs({
+    required this.isCitizen,
+    required this.onChanged,
+    required this.citizenLabel,
+    required this.departmentLabel,
+  });
 
   final bool isCitizen;
   final ValueChanged<bool> onChanged;
+  final String citizenLabel;
+  final String departmentLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -404,19 +435,87 @@ class _RoleTabs extends StatelessWidget {
         children: [
           Expanded(
             child: _TabButton(
-              label: 'नागरिक',
+              label: citizenLabel,
               selected: isCitizen,
               onTap: () => onChanged(true),
             ),
           ),
           Expanded(
             child: _TabButton(
-              label: 'विभाग',
+              label: departmentLabel,
               selected: !isCitizen,
               onTap: () => onChanged(false),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LanguageToggle extends StatelessWidget {
+  const _LanguageToggle({required this.isEnglish, required this.onChanged});
+
+  final bool isEnglish;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.greyBg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LanguagePill(
+            label: 'हिं',
+            selected: !isEnglish,
+            onTap: () => onChanged(false),
+          ),
+          _LanguagePill(
+            label: 'EN',
+            selected: isEnglish,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguagePill extends StatelessWidget {
+  const _LanguagePill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.brandBlue : Colors.transparent,
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.secondaryText,
+          ),
+        ),
       ),
     );
   }
@@ -534,12 +633,14 @@ class _PrimaryButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.loading,
+    required this.loadingLabel,
   });
 
   final VoidCallback? onPressed;
   final String label;
   final IconData icon;
   final bool loading;
+  final String loadingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -570,7 +671,7 @@ class _PrimaryButton extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'कृपया प्रतीक्षा करें...',
+                    loadingLabel,
                     style: GoogleFonts.notoSansDevanagari(
                       color: Colors.white,
                       fontSize: 15,
@@ -600,9 +701,10 @@ class _PrimaryButton extends StatelessWidget {
 
 
 class _TermsFooter extends StatelessWidget {
-  const _TermsFooter({required this.onLinkTap});
+  const _TermsFooter({required this.onLinkTap, required this.isEnglish});
 
   final ValueChanged<String> onLinkTap;
+  final bool isEnglish;
 
   @override
   Widget build(BuildContext context) {
@@ -620,26 +722,39 @@ class _TermsFooter extends StatelessWidget {
       height: 1.6,
     );
 
+    final termsText = isEnglish ? 'Terms of Service' : 'सेवा की शर्तें';
+    final privacyText = isEnglish ? 'Privacy Policy' : 'गोपनीयता नीति';
+    final termsMessage = isEnglish
+        ? 'Terms of Service will be available soon'
+        : 'सेवा की शर्तें जल्द ही उपलब्ध होंगी';
+    final privacyMessage = isEnglish
+        ? 'Privacy Policy will be available soon'
+        : 'गोपनीयता नीति जल्द ही उपलब्ध होगी';
+
     return RichText(
       textAlign: TextAlign.center,
       text: TextSpan(
         style: baseStyle,
         children: [
-          const TextSpan(text: 'जारी रखते हुए, आप हमारी '),
           TextSpan(
-            text: 'सेवा की शर्तें',
+            text: isEnglish
+                ? 'By continuing, you agree to our '
+                : 'जारी रखते हुए, आप हमारी ',
+          ),
+          TextSpan(
+            text: termsText,
             style: linkStyle,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => onLinkTap('सेवा की शर्तें जल्द ही उपलब्ध होंगी'),
+              ..onTap = () => onLinkTap(termsMessage),
           ),
-          const TextSpan(text: ' और\n'),
+          TextSpan(text: isEnglish ? ' and\n' : ' और\n'),
           TextSpan(
-            text: 'गोपनीयता नीति',
+            text: privacyText,
             style: linkStyle,
             recognizer: TapGestureRecognizer()
-              ..onTap = () => onLinkTap('गोपनीयता नीति जल्द ही उपलब्ध होगी'),
+              ..onTap = () => onLinkTap(privacyMessage),
           ),
-          const TextSpan(text: ' से सहमत हैं।'),
+          TextSpan(text: isEnglish ? '.' : ' से सहमत हैं।'),
         ],
       ),
     );

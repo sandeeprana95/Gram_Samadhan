@@ -4,10 +4,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../data/sample_data.dart';
 import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
+import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
 import 'complaint_details_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
@@ -26,13 +27,58 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   LatLng? _myLocation;
 
-  List<Complaint> get _geoComplaints =>
-      complaints.where((c) => c.latitude != null && c.longitude != null).toList();
+  List<Complaint> _complaints = [];
+  bool _loading = true;
+  ComplaintStatus? _statusFilter;
+
+  List<Complaint> get _geoComplaints => _complaints
+      .where((c) => c.latitude != null && c.longitude != null)
+      .where((c) => _statusFilter == null || c.status == _statusFilter)
+      .toList();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
+    _loadComplaints();
+  }
+
+  Future<void> _loadComplaints() async {
+    setState(() => _loading = true);
+    try {
+      final complaints = await ComplaintApi.getMine();
+      if (!mounted) return;
+      setState(() => _complaints = complaints);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitToComplaints());
+    } on ComplaintApiException catch (_) {
+      // Keep showing an empty map if complaints can't be loaded.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _toggleFilter(ComplaintStatus status) {
+    setState(() {
+      _statusFilter = _statusFilter == status ? null : status;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fitToComplaints());
+  }
+
+  void _fitToComplaints() {
+    final points = _geoComplaints
+        .map((c) => LatLng(c.latitude!, c.longitude!))
+        .toList();
+    if (points.isEmpty) return;
+    if (points.length == 1) {
+      _mapController.move(points.first, _myLocationZoom);
+      return;
+    }
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: points,
+        padding: const EdgeInsets.fromLTRB(40, 100, 40, 220),
+      ),
+    );
   }
 
   Future<void> _loadMyLocation() async {
@@ -43,7 +89,9 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
       if (!mounted) return;
       final here = LatLng(position.latitude, position.longitude);
       setState(() => _myLocation = here);
-      _mapController.move(here, _myLocationZoom);
+      if (_geoComplaints.isEmpty) {
+        _mapController.move(here, _myLocationZoom);
+      }
     } catch (_) {
       // Keep showing the default map center if location can't be read.
     }
@@ -77,7 +125,20 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: Column(
+        children: [
+          GradientHeader(
+            title: 'Home',
+            actions: defaultHeaderActions(context),
+          ),
+          Expanded(child: _buildMapBody(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapBody(BuildContext context) {
+    return Stack(
         children: [
           FlutterMap(
             mapController: _mapController,
@@ -89,8 +150,12 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
                 userAgentPackageName: 'com.example.my_first_app',
+                errorTileCallback: (tile, error, stackTrace) {
+                  debugPrint('Tile load failed for ${tile.coordinates}: $error');
+                },
               ),
               MarkerLayer(
                 markers: [
@@ -121,11 +186,27 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             ],
           ),
           _buildSearchBar(context),
-          const Positioned(
+          Positioned(
             left: AppSpacing.screen,
             bottom: AppSpacing.screen,
-            child: _MapLegend(),
+            child: _MapLegend(
+              selected: _statusFilter,
+              onSelect: _toggleFilter,
+            ),
           ),
+          if (_loading)
+            const Positioned(
+              top: 70,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+              ),
+            ),
           Positioned(
             right: AppSpacing.screen,
             bottom: AppSpacing.screen,
@@ -138,15 +219,12 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
             ),
           ),
         ],
-      ),
     );
   }
 
   Widget _buildSearchBar(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-
     return Positioned(
-      top: topPadding + 12,
+      top: 12,
       left: AppSpacing.screen,
       right: AppSpacing.screen,
       child: Material(
@@ -227,7 +305,10 @@ class _TeardropMarker extends StatelessWidget {
 }
 
 class _MapLegend extends StatelessWidget {
-  const _MapLegend();
+  const _MapLegend({required this.selected, required this.onSelect});
+
+  final ComplaintStatus? selected;
+  final ValueChanged<ComplaintStatus> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -254,30 +335,59 @@ class _MapLegend extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _legendRow(const Color(0xFFD32F2F), 'Pending'),
+          _legendRow(
+            const Color(0xFFD32F2F),
+            'Pending',
+            ComplaintStatus.pending,
+          ),
           const SizedBox(height: 6),
-          _legendRow(const Color(0xFFF9A825), 'In Progress'),
+          _legendRow(
+            const Color(0xFFF9A825),
+            'In Progress',
+            ComplaintStatus.inProgress,
+          ),
           const SizedBox(height: 6),
-          _legendRow(const Color(0xFF2E7D32), 'Resolved'),
+          _legendRow(
+            const Color(0xFF2E7D32),
+            'Resolved',
+            ComplaintStatus.resolved,
+          ),
         ],
       ),
     );
   }
 
-  Widget _legendRow(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.location_on, color: color, size: 18),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            color: const Color(0xFF424242),
+  Widget _legendRow(Color color, String label, ComplaintStatus status) {
+    final isSelected = selected == status;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => onSelect(status),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_on, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  color: isSelected ? color : const Color(0xFF424242),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

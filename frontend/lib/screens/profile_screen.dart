@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../navigation/app_navigation.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
 import 'officer_reports_screen.dart';
 import 'settings_screen.dart';
@@ -116,28 +117,43 @@ class _ProfileHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(
         AppSpacing.screen,
         topPadding + 24,
-        AppSpacing.screen,
+        8,
         48,
       ),
       decoration: const BoxDecoration(gradient: AppGradients.header),
-      child: Column(
+      child: Stack(
         children: [
-          const CircleAvatar(
-            radius: 40,
-            backgroundColor: Colors.white,
-            child: Icon(
-              Icons.person_rounded,
-              color: AppColors.primary,
-              size: 44,
-            ),
+          Column(
+            children: [
+              const CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppColors.primary,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFFFF3E0),
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              color: const Color(0xFFFFF3E0),
-              fontSize: 13,
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconTheme(
+              data: const IconThemeData(color: Colors.white),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: defaultHeaderActions(context),
+              ),
             ),
           ),
         ],

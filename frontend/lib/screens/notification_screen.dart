@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
 
 enum _NotifKind { resolved, assigned, submitted, rejected }
 
@@ -57,10 +58,12 @@ class NotificationScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          _NotifHeader(
+          GradientHeader(
+            title: 'Notifications',
             onBack: showBackButton
                 ? () => Navigator.of(context).maybePop()
                 : null,
+            actions: defaultHeaderActions(context),
           ),
           Expanded(
             child: Transform.translate(
@@ -87,43 +90,6 @@ class NotificationScreen extends StatelessWidget {
                       _NotifRow(item: _notifications[index]),
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NotifHeader extends StatelessWidget {
-  const _NotifHeader({required this.onBack});
-
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(8, topPadding + 8, AppSpacing.screen, 26),
-      decoration: const BoxDecoration(gradient: AppGradients.header),
-      child: Row(
-        children: [
-          if (onBack != null)
-            IconButton(
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              tooltip: 'Back',
-            )
-          else
-            const SizedBox(width: 12),
-          Text(
-            'Notifications',
-            style: GoogleFonts.notoSansDevanagari(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],

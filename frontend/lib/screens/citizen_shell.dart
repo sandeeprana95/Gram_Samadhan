@@ -45,60 +45,63 @@ class _CitizenShellState extends State<CitizenShell> {
         color: AppColors.background,
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: _NavIcon(
-                      icon: Icons.home_outlined,
-                      selectedIcon: Icons.home_rounded,
-                      label: 'Home',
-                      selected: _index == 0,
-                      onTap: () => setState(() => _index = 0),
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.0,
+            child: SizedBox(
+              height: 76,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: _NavIcon(
+                        icon: Icons.home_outlined,
+                        selectedIcon: Icons.home_rounded,
+                        label: 'Home',
+                        selected: _index == 0,
+                        onTap: () => setState(() => _index = 0),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: _NavIcon(
-                      icon: Icons.assignment_outlined,
-                      selectedIcon: Icons.assignment_rounded,
-                      label: 'Complaints',
-                      selected: _index == 1,
-                      onTap: () => setState(() => _index = 1),
+                  Expanded(
+                    child: Center(
+                      child: _NavIcon(
+                        icon: Icons.assignment_outlined,
+                        selectedIcon: Icons.assignment_rounded,
+                        label: 'Complaints',
+                        selected: _index == 1,
+                        onTap: () => setState(() => _index = 1),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: _NewComplaintButton(onTap: _openNewComplaint),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: _NavIcon(
-                      icon: Icons.notifications_outlined,
-                      selectedIcon: Icons.notifications_rounded,
-                      label: 'Alerts',
-                      selected: _index == 2,
-                      onTap: () => setState(() => _index = 2),
+                  Expanded(
+                    child: Center(
+                      child: _NewComplaintButton(onTap: _openNewComplaint),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: _NavIcon(
-                      icon: Icons.person_outline,
-                      selectedIcon: Icons.person_rounded,
-                      label: 'Profile',
-                      selected: _index == 3,
-                      onTap: () => setState(() => _index = 3),
+                  Expanded(
+                    child: Center(
+                      child: _NavIcon(
+                        icon: Icons.notifications_outlined,
+                        selectedIcon: Icons.notifications_rounded,
+                        label: 'Alerts',
+                        selected: _index == 2,
+                        onTap: () => setState(() => _index = 2),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Center(
+                      child: _NavIcon(
+                        icon: Icons.person_outline,
+                        selectedIcon: Icons.person_rounded,
+                        label: 'Profile',
+                        selected: _index == 3,
+                        onTap: () => setState(() => _index = 3),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -135,12 +138,17 @@ class _NavIcon extends StatelessWidget {
           children: [
             Icon(selected ? selectedIcon : icon, color: color, size: 24),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: color,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
               ),
             ),
           ],

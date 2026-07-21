@@ -5,6 +5,7 @@ import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
 
@@ -113,7 +114,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const _MyComplaintsHeader(),
+          _MyComplaintsHeader(),
           Expanded(
             child: Transform.translate(
               offset: const Offset(0, -20),
@@ -304,86 +305,66 @@ class _MyComplaintsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.screen,
-        topPadding + 12,
-        AppSpacing.screen,
-        28,
-      ),
-      decoration: const BoxDecoration(gradient: AppGradients.header),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'My Complaints',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+    return GradientHeader(
+      title: 'My Complaints',
+      actions: defaultHeaderActions(context),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                style: GoogleFonts.poppins(color: Colors.white),
+                cursorColor: Colors.white,
+                decoration: InputDecoration(
+                  hintText: 'Search complaint ID or title',
+                  hintStyle: GoogleFonts.poppins(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.22),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                  ),),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  style: GoogleFonts.poppins(color: Colors.white),
-                  cursorColor: Colors.white,
-                  decoration: InputDecoration(
-                    hintText: 'Search complaint ID or title',
-                    hintStyle: GoogleFonts.poppins(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 14,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.22),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.button),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.gap),
-              Material(
-                color: Colors.white.withValues(alpha: 0.22),
+            const SizedBox(width: AppSpacing.gap),
+            Material(
+              color: Colors.white.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              child: InkWell(
+                onTap: () {},
                 borderRadius: BorderRadius.circular(AppRadius.button),
-                child: InkWell(
-                  onTap: () {},
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(
-                      Icons.filter_list_rounded,
-                      color: Colors.white.withValues(alpha: 0.95),
-                    ),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(
+                    Icons.filter_list_rounded,
+                    color: Colors.white.withValues(alpha: 0.95),
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

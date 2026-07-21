@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../navigation/app_navigation.dart';
 import '../screens/login_screen.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 class AppScaffold extends StatelessWidget {
@@ -149,6 +150,65 @@ class GradientHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Standard info + overflow (logout) icon pair shown on the right side of
+/// every tab header.
+List<Widget> defaultHeaderActions(BuildContext context) {
+  return [
+    IconButton(
+      icon: const Icon(Icons.info_outline_rounded),
+      tooltip: 'How to use this app',
+      onPressed: () => _showHowToDialog(context),
+    ),
+    PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert_rounded),
+      tooltip: 'More options',
+      onSelected: (value) {
+        if (value == 'logout') _handleLogout(context);
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 20, color: AppColors.secondaryText),
+              SizedBox(width: 12),
+              Text('Logout'),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ];
+}
+
+void _showHowToDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('How to Raise a Complaint'),
+      content: Text(
+        'यहाँ जल्द ही एक वीडियो जोड़ा जाएगा जो बताएगा कि ऐप का उपयोग करके '
+        'शिकायत कैसे दर्ज करें।\n\n'
+        'A short tutorial video showing how to use the app and raise a '
+        'complaint will be added here soon.',
+        style: GoogleFonts.notoSansDevanagari(height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _handleLogout(BuildContext context) async {
+  await AuthService.logout();
+  if (!context.mounted) return;
+  pushReplacement(context, const LoginScreen());
 }
 
 class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
