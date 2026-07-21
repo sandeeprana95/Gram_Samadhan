@@ -5,10 +5,13 @@ import '../navigation/app_navigation.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
+import 'officer_reports_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.showReportsLink = false});
+
+  final bool showReportsLink;
 
   static const _role = 'Citizen · Village Bhondsi, Gurugram';
 
@@ -50,6 +53,13 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: AppSpacing.screen),
                     _NavCard(
                       items: [
+                        if (showReportsLink)
+                          _NavItemData(
+                            icon: Icons.bar_chart_rounded,
+                            title: 'Reports',
+                            onTap: () =>
+                                push(context, const OfficerReportsScreen()),
+                          ),
                         _NavItemData(
                           icon: Icons.translate_rounded,
                           title: 'भाषा बदलें',

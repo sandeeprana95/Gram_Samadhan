@@ -7,7 +7,6 @@ import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/complaint_widgets.dart';
 import 'complaint_details_screen.dart';
-import 'new_complaint_screen.dart';
 
 enum _ComplaintFilter { all, active, inProgress, done, overdue }
 
@@ -112,44 +111,6 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF57C00), Color(0xFF2E7D32)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: FloatingActionButton(
-            heroTag: 'my_complaints_fab',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const NewComplaintScreen(),
-                ),
-              );
-              _load();
-            },
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            highlightElevation: 0,
-            child: const Icon(Icons.add, color: Colors.white, size: 28),
-          ),
-        ),
-      ),
       body: Column(
         children: [
           const _MyComplaintsHeader(),

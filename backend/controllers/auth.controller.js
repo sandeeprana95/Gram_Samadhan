@@ -5,6 +5,8 @@ import prisma from "../config/prisma.js";
 
 const MOBILE_PATTERN = /^[6-9]\d{9}$/;
 const OTP_TTL_MS = 2 * 60 * 1000;
+// Lets QA/reviewers sign in without a real SMS OTP; verifyOtp accepts any OTP for this number.
+const TEST_MOBILE = "9999999999";
 const SMS_GATEWAY_URL = "https://sms.pixabits.in/smsapi/sms/custom/send";
 
 const normalizeMobile = (mobile) => {
@@ -137,18 +139,20 @@ export const verifyOtp = async(req, res) => {
             });
         }
 
-        const record = await prisma.otp.findFirst({
-            where: { mobile, otp: String(otp) },
-            orderBy: { createdAt: "desc" },
-        });
+        if (mobile !== TEST_MOBILE) {
+            const record = await prisma.otp.findFirst({
+                where: { mobile, otp: String(otp) },
+                orderBy: { createdAt: "desc" },
+            });
 
-        if (!record) {
-            return res.status(400).json({ success: false, message: "Invalid OTP" });
-        }
+            if (!record) {
+                return res.status(400).json({ success: false, message: "Invalid OTP" });
+            }
 
-        if (record.expiresAt < new Date()) {
-            await prisma.otp.deleteMany({ where: { mobile } });
-            return res.status(400).json({ success: false, message: "OTP expired" });
+            if (record.expiresAt < new Date()) {
+                await prisma.otp.deleteMany({ where: { mobile } });
+                return res.status(400).json({ success: false, message: "OTP expired" });
+            }
         }
 
         await prisma.otp.deleteMany({ where: { mobile } });

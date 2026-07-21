@@ -20,7 +20,9 @@ class _NotifItem {
 }
 
 class NotificationScreen extends StatelessWidget {
-  const NotificationScreen({super.key});
+  const NotificationScreen({super.key, this.showBackButton = true});
+
+  final bool showBackButton;
 
   static const _notifications = [
     _NotifItem(
@@ -55,7 +57,11 @@ class NotificationScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          _NotifHeader(onBack: () => Navigator.of(context).maybePop()),
+          _NotifHeader(
+            onBack: showBackButton
+                ? () => Navigator.of(context).maybePop()
+                : null,
+          ),
           Expanded(
             child: Transform.translate(
               offset: const Offset(0, -20),
@@ -92,7 +98,7 @@ class NotificationScreen extends StatelessWidget {
 class _NotifHeader extends StatelessWidget {
   const _NotifHeader({required this.onBack});
 
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -104,11 +110,14 @@ class _NotifHeader extends StatelessWidget {
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Row(
         children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            tooltip: 'Back',
-          ),
+          if (onBack != null)
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              tooltip: 'Back',
+            )
+          else
+            const SizedBox(width: 12),
           Text(
             'Notifications',
             style: GoogleFonts.notoSansDevanagari(

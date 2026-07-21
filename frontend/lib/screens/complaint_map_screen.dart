@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -21,9 +22,32 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   static const _initialCenter = LatLng(28.3521, 77.0642);
   static const _initialZoom = 12.0;
+  static const _myLocationZoom = 15.0;
+
+  LatLng? _myLocation;
 
   List<Complaint> get _geoComplaints =>
       complaints.where((c) => c.latitude != null && c.longitude != null).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyLocation());
+  }
+
+  Future<void> _loadMyLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (!mounted) return;
+      final here = LatLng(position.latitude, position.longitude);
+      setState(() => _myLocation = here);
+      _mapController.move(here, _myLocationZoom);
+    } catch (_) {
+      // Keep showing the default map center if location can't be read.
+    }
+  }
 
   @override
   void dispose() {
@@ -32,7 +56,13 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   }
 
   void _recenter() {
-    _mapController.move(_initialCenter, _initialZoom);
+    final here = _myLocation;
+    if (here != null) {
+      _mapController.move(here, _myLocationZoom);
+    } else {
+      _mapController.move(_initialCenter, _initialZoom);
+      _loadMyLocation();
+    }
   }
 
   Color _markerColor(ComplaintStatus status) {
@@ -77,6 +107,14 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                           ComplaintDetailsScreen(complaint: complaint),
                         ),
                       ),
+                    ),
+                  if (_myLocation != null)
+                    Marker(
+                      point: _myLocation!,
+                      width: 26,
+                      height: 26,
+                      alignment: Alignment.center,
+                      child: const _MyLocationDot(),
                     ),
                 ],
               ),
@@ -124,11 +162,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
           ),
           child: Row(
             children: [
-              InkWell(
-                onTap: () => Navigator.of(context).maybePop(),
-                borderRadius: BorderRadius.circular(20),
-                child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF616161)),
-              ),
+              const Icon(Icons.search_rounded, color: Color(0xFF616161)),
               const SizedBox(width: 12),
               Expanded(
                 child: TextField(
@@ -144,10 +178,27 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
                   ),
                 ),
               ),
-              const Icon(Icons.search_rounded, color: AppColors.primary),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MyLocationDot extends StatelessWidget {
+  const _MyLocationDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.brandBlue,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+        ],
       ),
     );
   }

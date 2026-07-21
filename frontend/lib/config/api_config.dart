@@ -14,7 +14,7 @@ class ApiConfig {
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:$_devPort';
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:$_devPort';
+      return 'http://172.16.1.147:$_devPort';
     }
     return 'http://localhost:$_devPort';
   }
