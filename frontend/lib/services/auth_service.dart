@@ -3,10 +3,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_role.dart';
 
 class AuthSession {
-  const AuthSession({required this.token, required this.role});
+  const AuthSession({
+    required this.token,
+    required this.role,
+    this.officerId,
+    this.officerName,
+    this.staffId,
+  });
 
   final String token;
   final UserRole role;
+
+  /// Server-side user id, for display/UX only — the backend never trusts
+  /// this value from the client, it always derives identity from the JWT.
+  final String? officerId;
+  final String? officerName;
+  final String? staffId;
 
   bool get isValid => token.isNotEmpty;
 }
@@ -17,6 +29,9 @@ class AuthService {
   static const _tokenKey = 'auth_token';
   static const _roleKey = 'user_role';
   static const _loggedInKey = 'is_logged_in';
+  static const _officerIdKey = 'officer_id';
+  static const _officerNameKey = 'officer_name';
+  static const _staffIdKey = 'staff_id';
 
   static Future<AuthSession?> getSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -28,7 +43,13 @@ class AuthService {
       return null;
     }
 
-    return AuthSession(token: token, role: role);
+    return AuthSession(
+      token: token,
+      role: role,
+      officerId: prefs.getString(_officerIdKey),
+      officerName: prefs.getString(_officerNameKey),
+      staffId: prefs.getString(_staffIdKey),
+    );
   }
 
   static Future<bool> isLoggedIn() async {
@@ -38,15 +59,34 @@ class AuthService {
 
   static Future<void> saveLogin({
     required UserRole role,
-    String? token,
+    required String token,
+    String? officerId,
+    String? officerName,
+    String? staffId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final authToken =
-        token ?? 'pg_${role.name}_${DateTime.now().millisecondsSinceEpoch}';
 
     await prefs.setBool(_loggedInKey, true);
-    await prefs.setString(_tokenKey, authToken);
+    await prefs.setString(_tokenKey, token);
     await prefs.setString(_roleKey, role.storageValue);
+
+    if (officerId != null) {
+      await prefs.setString(_officerIdKey, officerId);
+    } else {
+      await prefs.remove(_officerIdKey);
+    }
+
+    if (officerName != null) {
+      await prefs.setString(_officerNameKey, officerName);
+    } else {
+      await prefs.remove(_officerNameKey);
+    }
+
+    if (staffId != null) {
+      await prefs.setString(_staffIdKey, staffId);
+    } else {
+      await prefs.remove(_staffIdKey);
+    }
   }
 
   static Future<void> logout() async {
@@ -54,5 +94,8 @@ class AuthService {
     await prefs.remove(_loggedInKey);
     await prefs.remove(_tokenKey);
     await prefs.remove(_roleKey);
+    await prefs.remove(_officerIdKey);
+    await prefs.remove(_officerNameKey);
+    await prefs.remove(_staffIdKey);
   }
 }

@@ -136,7 +136,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
 
   String _instanceLabel(Survey survey) {
     final typeName = assetTypeById(survey.assetTypeId)?.name ?? 'Asset';
-    return '$typeName - ${survey.gramPanchayat} GP';
+    return '$typeName - ${survey.panchayat} GP';
   }
 
   Future<void> _detectLocation() async {

@@ -27,6 +27,22 @@ class OtpVerifyResult {
   final String mobile;
 }
 
+class StaffLoginResult {
+  const StaffLoginResult({
+    required this.token,
+    required this.id,
+    required this.staffId,
+    required this.role,
+    this.name,
+  });
+
+  final String token;
+  final String id;
+  final String staffId;
+  final String role;
+  final String? name;
+}
+
 /// Talks to `/api/auth` on the Gram Samadhan backend for the citizen
 /// mobile-number + OTP login flow.
 class AuthApi {
@@ -56,6 +72,18 @@ class AuthApi {
     return OtpVerifyResult(
       token: body['token'] as String? ?? '',
       mobile: user?['mobile'] as String? ?? mobile,
+    );
+  }
+
+  static Future<StaffLoginResult> staffLogin(String staffId, String password) async {
+    final body = await _post('/staff-login', {'staffId': staffId, 'password': password});
+    final user = body['user'] as Map<String, dynamic>? ?? const {};
+    return StaffLoginResult(
+      token: body['token'] as String? ?? '',
+      id: user['id'] as String? ?? '',
+      staffId: user['staffId'] as String? ?? staffId,
+      role: user['role'] as String? ?? 'OFFICER',
+      name: user['name'] as String?,
     );
   }
 

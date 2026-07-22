@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../data/asset_types_data.dart';
 import '../models/asset_type.dart';
 import '../models/survey.dart';
+import '../navigation/app_navigation.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import 'asset_survey_form_screen.dart';
+import 'surveyor_profile_screen.dart';
 
 class AssetSurveyScreen extends StatefulWidget {
   const AssetSurveyScreen({super.key});
@@ -103,12 +105,13 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
     return _existingAssets.where((s) {
       final typeName =
           assetTypeById(s.assetTypeId)?.name.toLowerCase() ?? '';
-      final location = '${s.gramPanchayat} ${s.district}'.toLowerCase();
-      final notes = s.notes.toLowerCase();
+      final location = '${s.village} ${s.panchayat}'.toLowerCase();
+      final description = (s.description ?? '').toLowerCase();
       return typeName.contains(q) ||
           location.contains(q) ||
-          notes.contains(q) ||
-          s.id.toLowerCase().contains(q);
+          description.contains(q) ||
+          s.assetName.toLowerCase().contains(q) ||
+          s.assetId.toLowerCase().contains(q);
     }).toList(growable: false);
   }
 
@@ -121,11 +124,21 @@ class _AssetSurveyScreenState extends State<AssetSurveyScreen> {
           GradientHeader(
             title: 'Asset Survey',
             subtitle: 'Survey new or existing assets · Live GPS',
-            onBack: () => Navigator.of(context).maybePop(),
-            actions: const [
-              Padding(
+            actions: [
+              const Padding(
                 padding: EdgeInsets.only(right: 8),
                 child: _LiveBadge(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.account_circle_rounded),
+                tooltip: 'Profile',
+                onPressed: () =>
+                    push(context, const SurveyorProfileScreen()),
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout_rounded),
+                tooltip: 'Logout',
+                onPressed: () => handleLogout(context),
               ),
             ],
           ),
@@ -580,9 +593,9 @@ class _ExistingAssetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = assetTypeById(survey.assetTypeId);
     final typeName = type?.name ?? survey.assetTypeId;
-    final location = '${survey.gramPanchayat}, ${survey.district}';
-    final name = survey.notes.trim().isNotEmpty
-        ? '${typeName} · ${survey.gramPanchayat}'
+    final location = '${survey.village}, ${survey.panchayat}';
+    final name = survey.assetName.trim().isNotEmpty
+        ? survey.assetName
         : typeName;
 
     return Card(

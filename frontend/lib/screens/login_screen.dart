@@ -65,9 +65,35 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _continueAsStaff() async {
-    await AuthService.saveLogin(role: _staffRole, token: null);
-    if (!mounted) return;
-    pushReplacement(context, dashboardForRole(_staffRole));
+    if (_isSubmitting) return;
+
+    final staffId = _userIdController.text.trim();
+    final password = _passwordController.text;
+    if (staffId.isEmpty || password.isEmpty) {
+      _showMessage(_t('यूज़र ID और पासवर्ड दर्ज करें', 'Enter User ID and Password'));
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final result = await AuthApi.staffLogin(staffId, password);
+      final serverRole = result.role.toUpperCase() == 'SURVEYOR'
+          ? UserRole.survey
+          : UserRole.officer;
+      await AuthService.saveLogin(
+        role: serverRole,
+        token: result.token,
+        officerId: result.id,
+        officerName: result.name,
+        staffId: result.staffId,
+      );
+      if (!mounted) return;
+      pushReplacement(context, dashboardForRole(serverRole));
+    } on AuthApiException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   void _showMessage(String message) {
@@ -249,8 +275,8 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       const SizedBox(height: 18),
       _PrimaryButton(
-        onPressed: _continueAsStaff,
-        loading: false,
+        onPressed: _isSubmitting ? null : _continueAsStaff,
+        loading: _isSubmitting,
         loadingLabel: _t('कृपया प्रतीक्षा करें...', 'Please wait...'),
         label: _t('लॉगिन करें', 'Login'),
         icon: Icons.login_rounded,
@@ -577,9 +603,9 @@ class _DepartmentRolePicker extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _RoleChip(
-            label: 'Admin',
-            selected: selected == UserRole.admin,
-            onTap: () => onChanged(UserRole.admin),
+            label: 'Survey',
+            selected: selected == UserRole.survey,
+            onTap: () => onChanged(UserRole.survey),
           ),
         ),
       ],
@@ -651,7 +677,7 @@ class _PrimaryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.brandBlue,
+            gradient: AppGradients.cta,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Container(

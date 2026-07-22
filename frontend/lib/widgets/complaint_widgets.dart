@@ -6,7 +6,6 @@ import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../screens/complaint_details_screen.dart';
 import '../screens/officer_action_screen.dart';
-import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 import 'common_widgets.dart';
 
@@ -25,12 +24,8 @@ String? complaintAssetTypeName(Complaint complaint) {
   return assetTypeById(id)?.name;
 }
 
-/// Village/GP label from linked survey instance, else complaint village.
+/// Village/GP label for a complaint.
 String complaintAssetLocationLabel(Complaint complaint) {
-  final instance = SurveyApi.getAssetInstance(complaint.assetInstanceId);
-  if (instance != null) {
-    return '${instance.gramPanchayat} GP, ${instance.district}';
-  }
   return '${complaint.village} GP';
 }
 

@@ -1,56 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/app_notification.dart';
+import '../services/notification_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 
-enum _NotifKind { resolved, assigned, submitted, rejected }
-
-class _NotifItem {
-  const _NotifItem({
-    required this.kind,
-    required this.title,
-    required this.description,
-    required this.time,
-  });
-
-  final _NotifKind kind;
-  final String title;
-  final String description;
-  final String time;
-}
-
-class NotificationScreen extends StatelessWidget {
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key, this.showBackButton = true});
 
   final bool showBackButton;
 
-  static const _notifications = [
-    _NotifItem(
-      kind: _NotifKind.submitted,
-      title: 'Complaint submitted',
-      description: 'PG-2026-0148 · Your damaged road complaint was registered successfully',
-      time: '2 hours ago',
-    ),
-    _NotifItem(
-      kind: _NotifKind.assigned,
-      title: 'Complaint assigned',
-      description: 'PG-2026-0142 · Street light issue assigned to Rajesh Kumar, JE',
-      time: '5 hours ago',
-    ),
-    _NotifItem(
-      kind: _NotifKind.resolved,
-      title: 'Complaint resolved',
-      description: 'PG-2026-0130 · Drainage issue at Badshahpur has been resolved',
-      time: 'Yesterday',
-    ),
-    _NotifItem(
-      kind: _NotifKind.rejected,
-      title: 'Complaint rejected',
-      description: 'PG-2026-0125 · Complaint rejected due to insufficient information',
-      time: '2 days ago',
-    ),
-  ];
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  bool _loading = true;
+  String? _error;
+  List<AppNotification> _notifications = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final notifications = await NotificationApi.getMine();
+      if (!mounted) return;
+      setState(() {
+        _notifications = notifications;
+        _loading = false;
+      });
+    } on NotificationApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'सूचनाएं लोड नहीं हो पाईं। पुनः प्रयास करें।';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +61,7 @@ class NotificationScreen extends StatelessWidget {
         children: [
           GradientHeader(
             title: 'Notifications',
-            onBack: showBackButton
+            onBack: widget.showBackButton
                 ? () => Navigator.of(context).maybePop()
                 : null,
             actions: defaultHeaderActions(context),
@@ -77,17 +78,9 @@ class NotificationScreen extends StatelessWidget {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(top: 8),
-                  itemCount: _notifications.length,
-                  separatorBuilder: (_, __) => const Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    indent: 72,
-                    color: AppColors.border,
-                  ),
-                  itemBuilder: (context, index) =>
-                      _NotifRow(item: _notifications[index]),
+                child: RefreshIndicator(
+                  onRefresh: _load,
+                  child: _buildBody(),
                 ),
               ),
             ),
@@ -96,40 +89,107 @@ class NotificationScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Icon(Icons.error_outline_rounded, size: 40, color: AppColors.secondaryText),
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: AppColors.secondaryText),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(onPressed: _load, child: const Text('पुनः प्रयास करें')),
+          ),
+        ],
+      );
+    }
+    if (_notifications.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Icon(Icons.notifications_none_rounded, size: 40, color: AppColors.secondaryText),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              'कोई सूचना नहीं',
+              style: GoogleFonts.poppins(color: AppColors.secondaryText),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 8),
+      itemCount: _notifications.length,
+      separatorBuilder: (_, __) => const Divider(
+        height: 1,
+        thickness: 0.5,
+        indent: 72,
+        color: AppColors.border,
+      ),
+      itemBuilder: (context, index) => _NotifRow(item: _notifications[index]),
+    );
+  }
 }
 
 class _NotifRow extends StatelessWidget {
   const _NotifRow({required this.item});
 
-  final _NotifItem item;
+  final AppNotification item;
 
   ({Color bg, Color fg, IconData icon}) get _style {
     switch (item.kind) {
-      case _NotifKind.resolved:
+      case NotificationKind.resolved:
         return (
           bg: AppColors.greenTint,
           fg: AppColors.resolvedText,
           icon: Icons.check_circle_rounded,
         );
-      case _NotifKind.assigned:
+      case NotificationKind.assigned:
         return (
           bg: AppColors.blueTint,
           fg: AppColors.inProgressText,
           icon: Icons.assignment_ind_rounded,
         );
-      case _NotifKind.submitted:
+      case NotificationKind.submitted:
         return (
           bg: AppColors.orangeTint,
           fg: AppColors.pendingText,
           icon: Icons.mark_email_unread_rounded,
         );
-      case _NotifKind.rejected:
+      case NotificationKind.rejected:
         return (
           bg: AppColors.rejectedBg,
           fg: AppColors.rejectedText,
           icon: Icons.cancel_rounded,
         );
     }
+  }
+
+  String get _relativeTime {
+    final date = item.createdAt;
+    if (date == null) return '';
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    final day = date.day.toString().padLeft(2, '0');
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '$day ${months[date.month - 1]} ${date.year}';
   }
 
   @override
@@ -165,7 +225,7 @@ class _NotifRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  item.description,
+                  item.message,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: const Color(0xFF616161),
@@ -174,7 +234,7 @@ class _NotifRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  item.time,
+                  _relativeTime,
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: const Color(0xFF9E9E9E),

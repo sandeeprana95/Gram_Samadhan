@@ -1,21 +1,21 @@
 import express from "express";
 import {
-    createComplaint,
-    getMyComplaints,
-    getComplaintById,
-    updateComplaintStatus,
-} from "../controllers/complaint.controller.js";
+    createSurvey,
+    getMySurveys,
+    getSurveyById,
+} from "../controllers/survey.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
-import { uploadComplaintPhoto } from "../middleware/upload.middleware.js";
+import { uploadSurveyPhotos } from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
 router.post(
     "/",
     requireAuth,
+    requireRole("SURVEYOR"),
     (req, res, next) => {
-        uploadComplaintPhoto(req, res, (err) => {
+        uploadSurveyPhotos(req, res, (err) => {
             if (err) {
                 return res.status(400).json({
                     success: false,
@@ -25,11 +25,10 @@ router.post(
             next();
         });
     },
-    createComplaint
+    createSurvey
 );
 
-router.get("/", requireAuth, getMyComplaints);
-router.get("/:id", requireAuth, getComplaintById);
-router.patch("/:id/status", requireAuth, requireRole("OFFICER"), updateComplaintStatus);
+router.get("/", requireAuth, requireRole("SURVEYOR"), getMySurveys);
+router.get("/:id", requireAuth, requireRole("SURVEYOR"), getSurveyById);
 
 export default router;

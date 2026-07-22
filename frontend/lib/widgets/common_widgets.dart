@@ -165,7 +165,7 @@ List<Widget> defaultHeaderActions(BuildContext context) {
       icon: const Icon(Icons.more_vert_rounded),
       tooltip: 'More options',
       onSelected: (value) {
-        if (value == 'logout') _handleLogout(context);
+        if (value == 'logout') handleLogout(context);
       },
       itemBuilder: (context) => const [
         PopupMenuItem(
@@ -205,7 +205,7 @@ void _showHowToDialog(BuildContext context) {
   );
 }
 
-Future<void> _handleLogout(BuildContext context) async {
+Future<void> handleLogout(BuildContext context) async {
   await AuthService.logout();
   if (!context.mounted) return;
   pushReplacement(context, const LoginScreen());

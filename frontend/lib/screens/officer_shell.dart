@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'asset_survey_screen.dart';
 import 'officer_dashboard_screen.dart';
 import 'officer_tasks_screen.dart';
 import 'profile_screen.dart';
@@ -18,7 +17,6 @@ class _OfficerShellState extends State<OfficerShell> {
   final _screens = const [
     OfficerDashboardScreen(),
     OfficerTasksScreen(),
-    AssetSurveyScreen(),
     ProfileScreen(showReportsLink: true),
   ];
 
@@ -39,11 +37,6 @@ class _OfficerShellState extends State<OfficerShell> {
             icon: Icon(Icons.task_outlined, size: 24),
             selectedIcon: Icon(Icons.task_rounded, size: 24),
             label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assessment_outlined, size: 24),
-            selectedIcon: Icon(Icons.assessment_rounded, size: 24),
-            label: 'Survey',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline, size: 24),

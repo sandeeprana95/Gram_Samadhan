@@ -1,56 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/survey.dart';
+import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
 
-const List<String> kHaryanaDistricts = [
-  'Ambala',
-  'Bhiwani',
-  'Charkhi Dadri',
-  'Faridabad',
-  'Fatehabad',
-  'Gurugram',
-  'Hisar',
-  'Jhajjar',
-  'Jind',
-  'Kaithal',
-  'Karnal',
-  'Kurukshetra',
-  'Mahendragarh',
-  'Nuh',
-  'Palwal',
-  'Panchkula',
-  'Panipat',
-  'Rewari',
-  'Rohtak',
-  'Sirsa',
-  'Sonipat',
-  'Yamunanagar',
-];
-
-const List<String> kConditionRatings = [
-  '1 - Poor',
-  '2 - Fair',
-  '3 - Good',
-  '4 - Very Good',
-  '5 - Excellent',
-];
-
-const List<String> kFunctionalStatuses = [
-  'Active',
-  'Inactive',
-  'Under Repair',
-  'Non-Functional',
-];
-
-const List<String> kPrInstitutionLevels = [
-  'Gram Panchayat',
-  'Panchayat Samiti',
-  'Zila Parishad',
-  'Not Applicable',
-];
+const List<String> kConditionLabels = ['Good', 'Fair', 'Poor', 'Damaged'];
 
 class AssetSurveyFormScreen extends StatefulWidget {
   const AssetSurveyFormScreen({
@@ -70,60 +31,61 @@ class AssetSurveyFormScreen extends StatefulWidget {
 
 class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _assetNameController = TextEditingController();
+  final _districtController = TextEditingController();
   final _gpController = TextEditingController();
-  final _notesController = TextEditingController();
+  final _villageController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _imagePicker = ImagePicker();
 
-  late final String _surveyId;
-  late final DateTime _createdAt;
+  late final DateTime _surveyDate;
 
-  String _district = 'Hisar';
   double? _lat;
   double? _lng;
   double? _accuracy;
   bool _gpsEnabled = false;
-  int _conditionRating = 3;
-  String _functionalStatus = 'Active';
-  String? _prLevel = 'Gram Panchayat';
-  final List<GeoTaggedPhoto> _photos = [];
+  bool _detectingLocation = false;
+  SurveyCondition _condition = SurveyCondition.good;
+  final List<Uint8List> _photos = [];
   bool _saving = false;
+  String? _officerName;
 
   @override
   void initState() {
     super.initState();
     final existing = widget.existingSurvey;
     if (existing != null) {
-      _surveyId = existing.id;
-      _createdAt = existing.createdAt;
-      _district = existing.district.isNotEmpty ? existing.district : 'Hisar';
-      _gpController.text = existing.gramPanchayat;
-      _notesController.text = existing.notes;
-      _lat = existing.gpsLat;
-      _lng = existing.gpsLng;
-      _accuracy = existing.gpsAccuracy;
-      _gpsEnabled = existing.gpsLat != null && existing.gpsLng != null;
-      _conditionRating = existing.conditionRating.clamp(1, 5);
-      _functionalStatus = existing.functionalStatus;
-      _prLevel = existing.prInstitutionLevel;
-      _photos.addAll(existing.photos);
+      _surveyDate = existing.surveyDate;
+      _assetNameController.text = existing.assetName;
+      _districtController.text = existing.district;
+      _gpController.text = existing.panchayat;
+      _villageController.text = existing.village;
+      _descriptionController.text = existing.description ?? '';
+      _lat = existing.latitude;
+      _lng = existing.longitude;
+      _gpsEnabled = existing.latitude != null && existing.longitude != null;
+      _condition = existing.condition;
     } else {
-      _surveyId = _generateSurveyId();
-      _createdAt = DateTime.now();
+      _surveyDate = DateTime.now();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _enableGps());
     }
+    _loadOfficerName();
+  }
+
+  Future<void> _loadOfficerName() async {
+    final session = await AuthService.getSession();
+    if (!mounted) return;
+    setState(() => _officerName = session?.officerName);
   }
 
   @override
   void dispose() {
+    _assetNameController.dispose();
+    _districtController.dispose();
     _gpController.dispose();
-    _notesController.dispose();
+    _villageController.dispose();
+    _descriptionController.dispose();
     super.dispose();
-  }
-
-  String _generateSurveyId() {
-    final now = DateTime.now();
-    final stamp =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
-        '${now.millisecond.toString().padLeft(3, '0')}';
-    return 'SVY-$stamp';
   }
 
   String get _dateLabel {
@@ -141,68 +103,109 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
       'Nov',
       'Dec',
     ];
-    final d = _createdAt;
+    final d = _surveyDate;
     return '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]} ${d.year}';
   }
 
-  void _enableGps() {
-    setState(() {
-      _gpsEnabled = true;
-      _lat = 29.1492;
-      _lng = 75.7217;
-      _accuracy = 6.4;
-    });
-  }
-
-  void _addPhoto() {
-    setState(() {
-      _photos.add(
-        GeoTaggedPhoto(
-          url: 'local://photo_${_photos.length + 1}.jpg',
-          latitude: _lat,
-          longitude: _lng,
-        ),
-      );
-    });
-  }
-
-  Survey _buildSurvey({required SurveyStatus status, required bool synced}) {
-    return Survey(
-      id: _surveyId,
-      assetTypeId: widget.assetTypeId,
-      district: _district,
-      gramPanchayat: _gpController.text.trim(),
-      gpsLat: _lat,
-      gpsLng: _lng,
-      gpsAccuracy: _accuracy,
-      conditionRating: _conditionRating,
-      functionalStatus: _functionalStatus,
-      prInstitutionLevel: _prLevel,
-      notes: _notesController.text.trim(),
-      photos: List.unmodifiable(_photos),
-      status: status,
-      synced: synced,
-      createdBy: 'citizen',
-      createdAt: _createdAt,
-    );
-  }
-
-  Future<void> _saveDraft() async {
-    if (_saving) return;
-    setState(() => _saving = true);
+  Future<void> _enableGps() async {
+    if (_detectingLocation) return;
+    setState(() => _detectingLocation = true);
     try {
-      await SurveyApi.saveDraft(
-        _buildSurvey(status: SurveyStatus.draft, synced: false),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Draft saved', style: GoogleFonts.poppins()),
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showMessage('कृपया अपने डिवाइस की लोकेशन सर्विस चालू करें');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage('स्थान दर्ज करने के लिए लोकेशन अनुमति आवश्यक है');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
         ),
       );
+
+      String? detectedVillage;
+      String? detectedPanchayat;
+      String? detectedDistrict;
+      try {
+        final placemarks = await Geocoding().placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          detectedVillage = (place.subLocality?.trim().isNotEmpty ?? false)
+              ? place.subLocality!.trim()
+              : place.locality?.trim();
+          detectedPanchayat = (place.locality?.trim().isNotEmpty ?? false)
+              ? place.locality!.trim()
+              : detectedVillage;
+          detectedDistrict = (place.subAdministrativeArea?.trim().isNotEmpty ?? false)
+              ? place.subAdministrativeArea!.trim()
+              : place.administrativeArea?.trim();
+        }
+      } catch (_) {
+        // Reverse geocoding unavailable; coordinates alone are still saved.
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _lat = position.latitude;
+        _lng = position.longitude;
+        _accuracy = position.accuracy;
+        _gpsEnabled = true;
+
+        if (_villageController.text.trim().isEmpty && detectedVillage != null) {
+          _villageController.text = detectedVillage;
+        }
+        if (_gpController.text.trim().isEmpty && detectedPanchayat != null) {
+          _gpController.text = detectedPanchayat;
+        }
+        if (_districtController.text.trim().isEmpty && detectedDistrict != null) {
+          _districtController.text = detectedDistrict;
+        }
+      });
+    } catch (_) {
+      _showMessage('लोकेशन प्राप्त नहीं हो सकी। कृपया पुनः प्रयास करें।');
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _detectingLocation = false);
     }
+  }
+
+  Future<void> _addPhoto() async {
+    if (_photos.length >= 5) {
+      _showMessage('अधिकतम 5 फोटो जोड़े जा सकते हैं');
+      return;
+    }
+    try {
+      final photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (photo == null) return;
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
+      setState(() => _photos.add(bytes));
+    } catch (_) {
+      _showMessage('फोटो लेने में समस्या हुई। कृपया कैमरा अनुमति जांचें।');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message, style: GoogleFonts.poppins())),
+    );
   }
 
   Future<void> _submit() async {
@@ -210,34 +213,42 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (!_gpsEnabled || _lat == null || _lng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Enable GPS to capture coordinates',
-            style: GoogleFonts.poppins(),
-          ),
-        ),
-      );
+      _showMessage('Enable GPS to capture coordinates');
+      return;
+    }
+
+    if (_photos.isEmpty) {
+      _showMessage('कम से कम एक फोटो जोड़ें');
       return;
     }
 
     setState(() => _saving = true);
     try {
-      await SurveyApi.submitSurvey(
-        _buildSurvey(status: SurveyStatus.submitted, synced: true),
+      final survey = await SurveyApi.submitSurvey(
+        assetTypeId: widget.assetTypeId,
+        assetName: _assetNameController.text.trim(),
+        district: _districtController.text.trim(),
+        panchayat: _gpController.text.trim(),
+        village: _villageController.text.trim(),
+        latitude: _lat,
+        longitude: _lng,
+        description: _descriptionController.text.trim(),
+        condition: _condition,
+        surveyDate: _surveyDate,
+        photos: _photos,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.existingSurvey != null
-                ? 'Survey updated'
-                : 'Survey submitted',
+            'Survey submitted · Asset ID: ${survey.assetId}',
             style: GoogleFonts.poppins(),
           ),
         ),
       );
       Navigator.of(context).pop();
+    } on SurveyApiException catch (e) {
+      _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -278,26 +289,40 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
                   children: [
                     _HeaderCard(
                       assetName: widget.assetTypeName,
-                      surveyId: _surveyId,
                       dateLabel: _dateLabel,
                       isUpdate: widget.existingSurvey != null,
                     ),
                     const SizedBox(height: 14),
-                    _LabeledDropdown<String>(
-                      label: 'District *',
-                      value: _district,
-                      items: kHaryanaDistricts,
-                      onChanged: (v) =>
-                          setState(() => _district = v ?? _district),
+                    _LabeledTextField(
+                      label: 'Asset Name *',
+                      controller: _assetNameController,
+                      hint: 'e.g. Main Road to School',
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     _LabeledTextField(
-                      label: 'Gram Panchayat *',
+                      label: 'District *',
+                      controller: _districtController,
+                      hint: 'Auto-filled from GPS',
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _LabeledTextField(
+                      label: 'Panchayat *',
                       controller: _gpController,
-                      hint: 'Enter GP name',
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Required'
-                          : null,
+                      hint: 'Auto-filled from GPS',
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _LabeledTextField(
+                      label: 'Village *',
+                      controller: _villageController,
+                      hint: 'Auto-filled from GPS',
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                     _GpsCoordinateField(
@@ -314,53 +339,39 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
                     const SizedBox(height: 12),
                     _GpsAccuracyRow(
                       enabled: _gpsEnabled,
+                      busy: _detectingLocation,
                       accuracy: _accuracy,
                       onEnable: _enableGps,
                     ),
                     const SizedBox(height: 12),
                     _LabeledDropdown<String>(
-                      label: 'Condition Rating *',
-                      value: kConditionRatings[_conditionRating - 1],
-                      items: kConditionRatings,
+                      label: 'Condition *',
+                      value: _condition.label,
+                      items: kConditionLabels,
                       onChanged: (v) {
                         if (v == null) return;
-                        setState(
-                          () => _conditionRating =
-                              kConditionRatings.indexOf(v) + 1,
-                        );
+                        setState(() {
+                          _condition = SurveyCondition.values
+                              .firstWhere((c) => c.label == v);
+                        });
                       },
                     ),
                     const SizedBox(height: 12),
-                    _LabeledDropdown<String>(
-                      label: 'Functional Status *',
-                      value: _functionalStatus,
-                      items: kFunctionalStatuses,
-                      onChanged: (v) => setState(
-                        () => _functionalStatus = v ?? _functionalStatus,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _LabeledDropdown<String>(
-                      label: 'PR Institution Level',
-                      value: _prLevel,
-                      items: kPrInstitutionLevels,
-                      onChanged: (v) => setState(() => _prLevel = v),
-                    ),
-                    const SizedBox(height: 12),
-                    _NotesField(controller: _notesController),
+                    _DescriptionField(controller: _descriptionController),
                     const SizedBox(height: 14),
                     _PhotosSection(
                       photos: _photos,
                       onAdd: _addPhoto,
                       onRemove: (i) => setState(() => _photos.removeAt(i)),
                     ),
+                    const SizedBox(height: 14),
+                    _SurveyedByRow(officerName: _officerName),
                   ],
                 ),
               ),
             ),
             _BottomActions(
               busy: _saving,
-              onSaveDraft: _saveDraft,
               onCancel: () => Navigator.of(context).maybePop(),
               onSubmit: _submit,
             ),
@@ -374,13 +385,11 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
 class _HeaderCard extends StatelessWidget {
   const _HeaderCard({
     required this.assetName,
-    required this.surveyId,
     required this.dateLabel,
     this.isUpdate = false,
   });
 
   final String assetName;
-  final String surveyId;
   final String dateLabel;
   final bool isUpdate;
 
@@ -420,7 +429,7 @@ class _HeaderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${isUpdate ? 'Update Asset Survey' : 'New Asset Survey'} · Survey ID: $surveyId · $dateLabel',
+                    '${isUpdate ? 'Update Asset Survey' : 'New Asset Survey'} · $dateLabel',
                     style: GoogleFonts.poppins(
                       fontSize: 11.5,
                       color: AppColors.mutedText,
@@ -591,11 +600,13 @@ class _GpsCoordinateField extends StatelessWidget {
 class _GpsAccuracyRow extends StatelessWidget {
   const _GpsAccuracyRow({
     required this.enabled,
+    required this.busy,
     required this.accuracy,
     required this.onEnable,
   });
 
   final bool enabled;
+  final bool busy;
   final double? accuracy;
   final VoidCallback onEnable;
 
@@ -616,10 +627,16 @@ class _GpsAccuracyRow extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: onEnable,
-              icon: const Icon(Icons.my_location_rounded, size: 18),
+              onPressed: busy ? null : onEnable,
+              icon: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location_rounded, size: 18),
               label: Text(
-                'Enable GPS',
+                busy ? 'Detecting...' : 'Enable GPS',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
               style: OutlinedButton.styleFrom(
@@ -649,9 +666,7 @@ class _GpsAccuracyRow extends StatelessWidget {
           ),
         const SizedBox(height: 6),
         Text(
-          enabled
-              ? '📍 Live GPS · Accurate'
-              : '📍 Live GPS · Waiting for fix',
+          enabled ? '📍 Live GPS · Accurate' : '📍 Live GPS · Waiting for fix',
           style: GoogleFonts.poppins(
             fontSize: 11.5,
             color: AppColors.mutedText,
@@ -662,8 +677,8 @@ class _GpsAccuracyRow extends StatelessWidget {
   }
 }
 
-class _NotesField extends StatelessWidget {
-  const _NotesField({required this.controller});
+class _DescriptionField extends StatelessWidget {
+  const _DescriptionField({required this.controller});
 
   final TextEditingController controller;
 
@@ -673,7 +688,7 @@ class _NotesField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Notes / Observations',
+          'Description',
           style: GoogleFonts.poppins(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
@@ -686,7 +701,7 @@ class _NotesField extends StatelessWidget {
           maxLines: 5,
           style: GoogleFonts.poppins(fontSize: 13),
           decoration: InputDecoration(
-            hintText: 'Additional observations...',
+            hintText: 'Describe the asset condition...',
             hintStyle: GoogleFonts.poppins(
               color: AppColors.mutedText,
               fontSize: 13,
@@ -706,7 +721,7 @@ class _PhotosSection extends StatelessWidget {
     required this.onRemove,
   });
 
-  final List<GeoTaggedPhoto> photos;
+  final List<Uint8List> photos;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
 
@@ -716,45 +731,46 @@ class _PhotosSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Photos',
+          'Photos (${photos.length}/5) *',
           style: GoogleFonts.poppins(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 6),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onAdd,
-            borderRadius: BorderRadius.circular(12),
-            child: CustomPaint(
-              painter: const _DashedBorderPainter(color: AppColors.secondary),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 22),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.photo_camera_rounded,
-                      color: AppColors.secondary,
-                      size: 28,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Click to upload photos',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.secondaryText,
+        if (photos.length < 5)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onAdd,
+              borderRadius: BorderRadius.circular(12),
+              child: CustomPaint(
+                painter: const _DashedBorderPainter(color: AppColors.secondary),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 22),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.photo_camera_rounded,
+                        color: AppColors.secondary,
+                        size: 28,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap to take a photo',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         if (photos.isNotEmpty) ...[
           const SizedBox(height: 10),
           Wrap(
@@ -762,14 +778,38 @@ class _PhotosSection extends StatelessWidget {
             runSpacing: 8,
             children: [
               for (var i = 0; i < photos.length; i++)
-                Chip(
-                  avatar: const Icon(Icons.image_rounded, size: 16),
-                  label: Text(
-                    'Photo ${i + 1}',
-                    style: GoogleFonts.poppins(fontSize: 12),
-                  ),
-                  deleteIcon: const Icon(Icons.close, size: 16),
-                  onDeleted: () => onRemove(i),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(
+                        photos[i],
+                        width: 76,
+                        height: 76,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: InkWell(
+                        onTap: () => onRemove(i),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: AppColors.rejectedText,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -779,16 +819,47 @@ class _PhotosSection extends StatelessWidget {
   }
 }
 
+class _SurveyedByRow extends StatelessWidget {
+  const _SurveyedByRow({required this.officerName});
+
+  final String? officerName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.greyBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.badge_rounded, size: 18, color: AppColors.mutedText),
+          const SizedBox(width: 8),
+          Text(
+            'Surveyed by: ${officerName ?? '—'}',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.secondaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BottomActions extends StatelessWidget {
   const _BottomActions({
     required this.busy,
-    required this.onSaveDraft,
     required this.onCancel,
     required this.onSubmit,
   });
 
   final bool busy;
-  final VoidCallback onSaveDraft;
   final VoidCallback onCancel;
   final VoidCallback onSubmit;
 
@@ -806,24 +877,6 @@ class _BottomActions extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: busy ? null : onSaveDraft,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.secondaryText,
-                  side: const BorderSide(color: AppColors.border),
-                  minimumSize: const Size.fromHeight(46),
-                ),
-                child: Text(
-                  '💾 Save Draft',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
                 onPressed: busy ? null : onCancel,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.secondaryText,
@@ -833,7 +886,7 @@ class _BottomActions extends StatelessWidget {
                 child: Text(
                   'Cancel',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -867,7 +920,7 @@ class _BottomActions extends StatelessWidget {
                               '☁ Submit',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

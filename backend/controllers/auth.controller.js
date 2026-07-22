@@ -1,5 +1,6 @@
 import { randomInt } from "crypto";
 import axios from "axios";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../config/prisma.js";
 
@@ -187,4 +188,48 @@ export const verifyOtp = async(req, res) => {
 // ===================== CURRENT USER =====================
 export const getMe = async(req, res) => {
     return res.status(200).json({ success: true, user: req.user });
+};
+
+// ===================== STAFF (OFFICER/ADMIN) LOGIN =====================
+export const staffLogin = async(req, res) => {
+    try {
+        const { staffId, password } = req.body;
+
+        if (!staffId || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Staff ID and password are required",
+            });
+        }
+
+        const user = await prisma.user.findUnique({ where: { staffId } });
+
+        if (!user || !user.passwordHash) {
+            return res.status(401).json({ success: false, message: "Invalid staff ID or password" });
+        }
+
+        const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+        if (!passwordMatches) {
+            return res.status(401).json({ success: false, message: "Invalid staff ID or password" });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Login successful",
+            token,
+            user: { id: user.id, staffId: user.staffId, name: user.name, role: user.role },
+        });
+    } catch (error) {
+        console.error("Staff login error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
 };

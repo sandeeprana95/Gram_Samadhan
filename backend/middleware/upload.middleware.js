@@ -7,8 +7,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadDir = path.join(__dirname, "..", "uploads", "complaints");
 fs.mkdirSync(uploadDir, { recursive: true });
 
+const surveyUploadDir = path.join(__dirname, "..", "uploads", "surveys");
+fs.mkdirSync(surveyUploadDir, { recursive: true });
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || ".jpg";
+        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+});
+
+const surveyStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, surveyUploadDir),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname) || ".jpg";
         cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
@@ -27,3 +38,9 @@ export const uploadComplaintPhoto = multer({
     fileFilter,
     limits: { fileSize: 8 * 1024 * 1024 },
 }).single("photo");
+
+export const uploadSurveyPhotos = multer({
+    storage: surveyStorage,
+    fileFilter,
+    limits: { fileSize: 8 * 1024 * 1024, files: 5 },
+}).array("photos", 5);
