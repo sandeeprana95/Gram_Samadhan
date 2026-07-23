@@ -13,7 +13,9 @@ import '../navigation/app_navigation.dart';
 import '../services/complaint_api.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/photo_stamp.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/photo_viewer.dart';
 import 'complaint_success_screen.dart';
 
 class NewComplaintScreen extends StatefulWidget {
@@ -24,12 +26,10 @@ class NewComplaintScreen extends StatefulWidget {
 }
 
 class _NewComplaintScreenState extends State<NewComplaintScreen> {
-  List<String> _villages = ['Unknown', 'Bhondsi', 'Sohna', 'Badshahpur', 'Gurugram'];
+  List<String> _villages = ['Unknown',];
   List<String> _panchayats = [
     'Unknown',
-    'Bhondsi Gram Panchayat',
-    'Sohna Gram Panchayat',
-    'Badshahpur Gram Panchayat',
+    
   ];
 
   String? _category;
@@ -233,7 +233,22 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
         imageQuality: 85,
       );
       if (photo == null) return;
-      final bytes = await photo.readAsBytes();
+      var bytes = await photo.readAsBytes();
+
+      if (_latitude == null || _longitude == null) {
+        await _detectLocation();
+      }
+
+      try {
+        bytes = await PhotoStamp.stamp(
+          bytes: bytes,
+          latitude: _latitude ?? 28.3521,
+          longitude: _longitude ?? 77.0642,
+        );
+      } catch (_) {
+        // Keep the unstamped photo if overlay rendering fails.
+      }
+
       if (!mounted) return;
       setState(() => _photoBytes = bytes);
     } catch (_) {
@@ -775,6 +790,53 @@ class _AttachmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final thumbnail = thumbnailBytes;
+
+    if (thumbnail != null) {
+      return CustomPaint(
+        painter: _DashedBorderPainter(
+          color: const Color(0xFFBDBDBD),
+          radius: AppRadius.button,
+        ),
+        child: Container(
+          height: 88,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.button - 2),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              InkWell(
+                onTap: () => showPhotoViewer(context, bytes: thumbnail),
+                child: Image.memory(thumbnail, fit: BoxFit.cover),
+              ),
+              Positioned(
+                right: 4,
+                top: 4,
+                child: Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: onTap,
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return CustomPaint(
       painter: _DashedBorderPainter(
         color: const Color(0xFFBDBDBD),
@@ -786,33 +848,7 @@ class _AttachmentTile extends StatelessWidget {
         child: Container(
           height: 88,
           alignment: Alignment.center,
-          child: thumbnailBytes != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.button - 2),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.memory(thumbnailBytes!, fit: BoxFit.cover),
-                      Positioned(
-                        right: 4,
-                        top: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_circle_rounded,
-                            color: AppColors.primary,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : busy
+          child: busy
               ? const SizedBox(
                   width: 22,
                   height: 22,

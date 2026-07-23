@@ -10,6 +10,8 @@ import '../models/survey.dart';
 import '../services/auth_service.dart';
 import '../services/survey_api.dart';
 import '../theme/app_theme.dart';
+import '../utils/photo_stamp.dart';
+import '../widgets/photo_viewer.dart';
 
 const List<String> kConditionLabels = ['Good', 'Fair', 'Poor', 'Damaged'];
 
@@ -193,7 +195,24 @@ class _AssetSurveyFormScreenState extends State<AssetSurveyFormScreen> {
         imageQuality: 85,
       );
       if (photo == null) return;
-      final bytes = await photo.readAsBytes();
+      var bytes = await photo.readAsBytes();
+
+      if (!_gpsEnabled || _lat == null || _lng == null) {
+        await _enableGps();
+      }
+
+      if (_lat != null && _lng != null) {
+        try {
+          bytes = await PhotoStamp.stamp(
+            bytes: bytes,
+            latitude: _lat!,
+            longitude: _lng!,
+          );
+        } catch (_) {
+          // Keep the unstamped photo if overlay rendering fails.
+        }
+      }
+
       if (!mounted) return;
       setState(() => _photos.add(bytes));
     } catch (_) {
@@ -783,11 +802,14 @@ class _PhotosSection extends StatelessWidget {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.memory(
-                        photos[i],
-                        width: 76,
-                        height: 76,
-                        fit: BoxFit.cover,
+                      child: InkWell(
+                        onTap: () => showPhotoViewer(context, bytes: photos[i]),
+                        child: Image.memory(
+                          photos[i],
+                          width: 76,
+                          height: 76,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     Positioned(

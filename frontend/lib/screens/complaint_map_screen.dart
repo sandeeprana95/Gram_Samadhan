@@ -8,7 +8,6 @@ import '../models/complaint.dart';
 import '../navigation/app_navigation.dart';
 import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
 import 'complaint_details_screen.dart';
 
 class ComplaintMapScreen extends StatefulWidget {
@@ -125,15 +124,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          GradientHeader(
-            title: 'Home',
-            actions: defaultHeaderActions(context),
-          ),
-          Expanded(child: _buildMapBody(context)),
-        ],
-      ),
+      body: _buildMapBody(context),
     );
   }
 
@@ -224,7 +215,7 @@ class _ComplaintMapScreenState extends State<ComplaintMapScreen> {
 
   Widget _buildSearchBar(BuildContext context) {
     return Positioned(
-      top: 12,
+      top: MediaQuery.paddingOf(context).top + 12,
       left: AppSpacing.screen,
       right: AppSpacing.screen,
       child: Material(

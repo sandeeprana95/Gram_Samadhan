@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../navigation/app_navigation.dart';
+import '../services/auth_api.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
@@ -9,12 +10,43 @@ import 'login_screen.dart';
 import 'officer_reports_screen.dart';
 import 'settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+String _formatMobile(String? mobile) {
+  if (mobile == null || mobile.length != 10) return mobile ?? '—';
+  return '+91 ${mobile.substring(0, 5)} ${mobile.substring(5)}';
+}
+
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.showReportsLink = false});
 
   final bool showReportsLink;
 
-  static const _role = 'Citizen · Village Bhondsi, Gurugram';
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _loading = true;
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await AuthApi.getProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +55,7 @@ class ProfileScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const _ProfileHeader(subtitle: _role),
+            const _ProfileHeader(subtitle: 'Citizen'),
             Transform.translate(
               offset: const Offset(0, -28),
               child: Padding(
@@ -32,29 +64,25 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _InfoCard(
-                      rows: const [
-                        _InfoRowData(
-                          icon: Icons.phone_rounded,
-                          label: 'Mobile',
-                          value: '+91 98765 43210',
-                        ),
-                        _InfoRowData(
-                          icon: Icons.location_city_rounded,
-                          label: 'Village / Panchayat',
-                          value: 'Bhondsi Gram Panchayat',
-                        ),
-                        _InfoRowData(
-                          icon: Icons.badge_rounded,
-                          label: 'User ID',
-                          value: 'PG-USR-004521',
-                        ),
-                      ],
-                    ),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: CircularProgressIndicator(),
+                      )
+                    else
+                      _InfoCard(
+                        rows: [
+                          _InfoRowData(
+                            icon: Icons.phone_rounded,
+                            label: 'Mobile',
+                            value: _formatMobile(_profile?.mobile),
+                          ),
+                        ],
+                      ),
                     const SizedBox(height: AppSpacing.screen),
                     _NavCard(
                       items: [
-                        if (showReportsLink)
+                        if (widget.showReportsLink)
                           _NavItemData(
                             icon: Icons.bar_chart_rounded,
                             title: 'Reports',
@@ -122,6 +150,7 @@ class _ProfileHeader extends StatelessWidget {
       ),
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Stack(
+        alignment: Alignment.topCenter,
         children: [
           Column(
             children: [

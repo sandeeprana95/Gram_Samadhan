@@ -6,6 +6,7 @@ import '../services/complaint_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/complaint_widgets.dart';
+import '../widgets/photo_viewer.dart';
 
 class ComplaintDetailsScreen extends StatefulWidget {
   const ComplaintDetailsScreen({super.key, required this.complaint});
@@ -242,10 +243,13 @@ class _PhotoPlaceholder extends StatelessWidget {
         border: Border.all(color: AppColors.border, width: 0.5),
       ),
       child: url != null
-          ? Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _placeholderContent(),
+          ? InkWell(
+              onTap: () => showPhotoViewer(context, imageUrl: url),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _placeholderContent(),
+              ),
             )
           : _placeholderContent(),
     );

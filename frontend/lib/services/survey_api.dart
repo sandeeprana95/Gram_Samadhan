@@ -75,8 +75,8 @@ class SurveyApi {
           http.MultipartFile.fromBytes(
             'photos',
             photos[i],
-            filename: 'survey_photo_$i.jpg',
-            contentType: MediaType('image', 'jpeg'),
+            filename: 'survey_photo_$i.png',
+            contentType: MediaType('image', 'png'),
           ),
         );
       }

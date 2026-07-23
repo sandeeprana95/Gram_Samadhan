@@ -60,8 +60,8 @@ class ComplaintApi {
           http.MultipartFile.fromBytes(
             'photo',
             photoBytes,
-            filename: 'complaint_photo.jpg',
-            contentType: MediaType('image', 'jpeg'),
+            filename: 'complaint_photo.png',
+            contentType: MediaType('image', 'png'),
           ),
         );
       }

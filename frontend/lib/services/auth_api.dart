@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class AuthApiException implements Exception {
   AuthApiException(this.message);
@@ -41,6 +42,32 @@ class StaffLoginResult {
   final String staffId;
   final String role;
   final String? name;
+}
+
+class UserProfile {
+  const UserProfile({
+    required this.id,
+    this.mobile,
+    this.staffId,
+    this.name,
+    required this.role,
+  });
+
+  final String id;
+  final String? mobile;
+  final String? staffId;
+  final String? name;
+  final String role;
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'] as String? ?? '',
+      mobile: json['mobile'] as String?,
+      staffId: json['staffId'] as String?,
+      name: json['name'] as String?,
+      role: json['role'] as String? ?? 'CITIZEN',
+    );
+  }
 }
 
 /// Talks to `/api/auth` on the Gram Samadhan backend for the citizen
@@ -85,6 +112,41 @@ class AuthApi {
       role: user['role'] as String? ?? 'OFFICER',
       name: user['name'] as String?,
     );
+  }
+
+  static Future<UserProfile> getProfile() async {
+    final session = await AuthService.getSession();
+    if (session == null || !session.isValid) {
+      throw AuthApiException('कृपया पहले लॉगिन करें');
+    }
+
+    late final http.Response response;
+    try {
+      response = await http
+          .get(
+            _uri('/me'),
+            headers: {'Authorization': 'Bearer ${session.token}'},
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw AuthApiException('Server से कनेक्ट नहीं हो पाया। कृपया पुनः प्रयास करें।');
+    }
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      body = const {};
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthApiException(
+        body['message'] as String? ?? 'प्रोफ़ाइल लोड नहीं हो पाई। पुनः प्रयास करें।',
+      );
+    }
+
+    final user = body['user'] as Map<String, dynamic>? ?? const {};
+    return UserProfile.fromJson(user);
   }
 
   static Future<Map<String, dynamic>> _post(

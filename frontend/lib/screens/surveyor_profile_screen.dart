@@ -126,6 +126,7 @@ class _ProfileHeader extends StatelessWidget {
       ),
       decoration: const BoxDecoration(gradient: AppGradients.header),
       child: Stack(
+        alignment: Alignment.topCenter,
         children: [
           Column(
             children: [

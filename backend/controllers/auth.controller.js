@@ -187,7 +187,30 @@ export const verifyOtp = async(req, res) => {
 
 // ===================== CURRENT USER =====================
 export const getMe = async(req, res) => {
-    return res.status(200).json({ success: true, user: req.user });
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            user: {
+                id: user.id,
+                mobile: user.mobile,
+                staffId: user.staffId,
+                name: user.name,
+                role: user.role,
+            },
+        });
+    } catch (error) {
+        console.error("Get profile error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
 };
 
 // ===================== STAFF (OFFICER/ADMIN) LOGIN =====================
