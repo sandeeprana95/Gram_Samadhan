@@ -5,9 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../config/api_config.dart';
-import '../data/asset_types_data.dart';
+import '../data/asset_types_data.dart' as local_asset_types;
 import '../models/asset_type.dart';
 import '../models/survey.dart';
+import 'asset_type_api.dart';
 import 'auth_service.dart';
 
 class SurveyApiException implements Exception {
@@ -27,11 +28,17 @@ class SurveyApi {
   static Uri _uri(String path) =>
       Uri.parse('${ApiConfig.baseUrl}/api/surveys$path');
 
-  /// Asset type catalog — a static reference list, not user data, so this
-  /// stays local rather than round-tripping to the backend.
+  /// Asset type catalog, fetched from the backend so new types can be added
+  /// without an app release. Falls back to the bundled list if the
+  /// device is offline or the backend call fails.
   static Future<List<AssetType>> getAssetTypes() async {
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    return List<AssetType>.unmodifiable(assetTypes);
+    try {
+      final types = await AssetTypeApi.getAssetTypes();
+      if (types.isNotEmpty) return types;
+    } catch (_) {
+      // Fall back to the bundled catalog below.
+    }
+    return List<AssetType>.unmodifiable(local_asset_types.assetTypes);
   }
 
   static Future<Survey> submitSurvey({

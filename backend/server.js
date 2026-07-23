@@ -14,6 +14,7 @@ import authRoutes from "./routes/auth.routes.js"
 import complaintRoutes from "./routes/complaint.routes.js"
 import surveyRoutes from "./routes/survey.routes.js"
 import notificationRoutes from "./routes/notification.routes.js"
+import assetTypeRoutes from "./routes/assetType.routes.js"
 
 app.use(cors())
 app.use(express.json())
@@ -24,6 +25,7 @@ app.use("/api/auth",authRoutes)
 app.use("/api/complaints",complaintRoutes)
 app.use("/api/surveys",surveyRoutes)
 app.use("/api/notifications",notificationRoutes)
+app.use("/api/asset-types",assetTypeRoutes)
 
 
 
